@@ -16,3 +16,4 @@ export const supabaseBrowser = createClient(supabaseUrl, supabaseAnonKey);
 // 기본 export
 export default supabaseBrowser;
 
+

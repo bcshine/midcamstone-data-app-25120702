@@ -80,30 +80,36 @@ function AdminDashboardContent() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8 relative">
-      {/* 상단 네비게이션 */}
-      <div className="absolute top-8 right-8 flex items-center gap-4">
-        <Link
-          href="/"
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
-        >
-          관리자 홈
-        </Link>
-        <Link
-          href="/settings"
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
-        >
-          ⚙️ 설정
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
-        >
-          로그아웃
-        </button>
-      </div>
-
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
       <div className="max-w-6xl mx-auto">
+        {/* 상단 네비게이션 바 */}
+        <div className="flex items-center justify-end gap-3 mb-6">
+          <Link
+            href="/"
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          >
+            관리자 홈
+          </Link>
+          <Link
+            href="/admin/trash"
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          >
+            🗑️ 휴지통
+          </Link>
+          <Link
+            href="/settings"
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          >
+            ⚙️ 설정
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          >
+            로그아웃
+          </button>
+        </div>
+
         {/* 헤더 */}
         <header className="mb-10">
           <div className="flex items-center justify-between">

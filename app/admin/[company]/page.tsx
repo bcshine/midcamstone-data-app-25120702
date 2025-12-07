@@ -38,6 +38,8 @@ export default function CompanyDetailPage({
   const [companyData, setCompanyData] = useState<CompanyInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);  // 삭제 대상 테이블
+  const [isDeleting, setIsDeleting] = useState(false);  // 삭제 중 상태
 
   // 데이터 로드
   useEffect(() => {
@@ -96,6 +98,54 @@ export default function CompanyDetailPage({
     const mm = dateCode.substring(2, 4);
     const dd = dateCode.substring(4, 6);
     return `20${yy}년 ${mm}월 ${dd}일`;
+  };
+
+  // 데이터 새로고침
+  const refreshData = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/admin/companies");
+      const data = await res.json();
+      if (res.ok) {
+        const found = data.companies?.find(
+          (c: CompanyInfo) => c.companyName === companyName
+        );
+        setCompanyData(found || null);
+      }
+    } catch (err) {
+      console.error("새로고침 오류:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 삭제 핸들러
+  const handleDelete = async (tableName: string) => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/admin/tables/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tableName }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(`삭제 실패: ${data.error}`);
+        return;
+      }
+
+      alert(data.message);
+      setDeleteTarget(null);
+      
+      // 데이터 새로고침
+      await refreshData();
+    } catch (err) {
+      alert("삭제 중 오류가 발생했습니다.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -227,12 +277,20 @@ export default function CompanyDetailPage({
                           {formatDate(table.uploadedAt)}
                         </td>
                         <td className="px-4 py-4">
-                          <Link
-                            href={`/admin/${encodeURIComponent(companyName)}/${table.tableName}`}
-                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium transition-colors"
-                          >
-                            데이터 보기
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/admin/${encodeURIComponent(companyName)}/${table.tableName}`}
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-medium transition-colors"
+                            >
+                              데이터 보기
+                            </Link>
+                            <button
+                              onClick={() => setDeleteTarget(table.tableName)}
+                              className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors"
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -250,6 +308,42 @@ export default function CompanyDetailPage({
           </Link>
         </footer>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <div className="bg-slate-800 border border-slate-600 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4">
+              🗑️ 휴지통으로 이동
+            </h3>
+            <p className="text-slate-300 mb-2">
+              이 데이터를 휴지통으로 이동하시겠습니까?
+            </p>
+            <p className="text-cyan-400 font-mono text-sm mb-6 p-3 bg-slate-900 rounded-lg">
+              {deleteTarget}
+            </p>
+            <p className="text-emerald-400 text-sm mb-6">
+              💡 휴지통에서 30일 후 자동 삭제됩니다. 그 전에 복원할 수 있습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-3 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleDelete(deleteTarget)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? "이동 중..." : "휴지통으로 이동"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

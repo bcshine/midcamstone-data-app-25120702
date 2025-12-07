@@ -409,6 +409,16 @@ function UploadPageContent() {
                     <span className="ml-2 text-emerald-400">{uploadResult.details.rowCount}행</span>
                   </div>
                 </div>
+
+                {/* 데이터 확인하기 버튼 */}
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <a
+                    href={`/data/${encodeURIComponent(uploadResult.details.companyName)}/${encodeURIComponent(uploadResult.details.tableName)}`}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-medium transition-all shadow-lg shadow-cyan-500/25"
+                  >
+                    📊 업로드된 데이터 확인하기
+                  </a>
+                </div>
               </div>
             )}
           </div>
