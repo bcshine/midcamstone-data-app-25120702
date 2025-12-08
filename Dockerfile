@@ -51,6 +51,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 
 ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 
-# Railway가 3000번을 기대하므로, PORT를 3000으로 강제 설정
-CMD ["sh", "-c", "PORT=3000 node server.js"]
+# 환경 변수로도 설정하고, 실행 시에도 강제 지정
+CMD ["sh", "-c", "export PORT=3000 && node server.js"]
