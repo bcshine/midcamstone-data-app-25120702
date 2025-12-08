@@ -29,6 +29,7 @@ pip install -r requirements.txt
 # Supabase 설정 (필수)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Python 분석 서버 URL
 PYTHON_API_URL=http://localhost:8000
@@ -77,6 +78,7 @@ Railway가 자동으로 Next.js를 감지합니다.
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 PYTHON_API_URL=https://your-python-service.railway.internal
 OPENAI_API_KEY=your-openai-key (선택사항)
 ```
@@ -105,6 +107,7 @@ Next.js 서비스의 `PYTHON_API_URL`을 Python 서비스의 내부 URL로 설�
 |--------|--------|------|
 | Next.js | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
 | Next.js | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 익명 키 |
+| Next.js | `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` | Supabase 서비스 역할 키 (관리 API용) |
 | Next.js | `PYTHON_API_URL` | Python API 서버 URL |
 | Next.js | `OPENAI_API_KEY` | OpenAI API 키 (선택) |
 | Python | `ALLOWED_ORIGINS` | CORS 허용 오리진 (쉼표 구분) |
