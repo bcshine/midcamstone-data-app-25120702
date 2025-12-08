@@ -36,8 +36,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Python API (별도 서비스)
-scripts/api/
+# Python API는 이제 포함됨 (통합 Docker)
 
 # Git
 .git
