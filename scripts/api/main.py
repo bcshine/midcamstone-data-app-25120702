@@ -3,6 +3,7 @@
 # 다중회귀분석 및 통계 분석 API 제공
 # =====================================================
 
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -24,9 +25,13 @@ app = FastAPI(
 )
 
 # CORS 설정 (Next.js에서 접근 허용)
+# 환경 변수에서 허용된 오리진 가져오기
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+origins_list = [origin.strip() for origin in allowed_origins.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
