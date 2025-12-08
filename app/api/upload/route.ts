@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 // CSV 파싱 유틸리티
 import { csvToJsonArray } from "../../../utils/csvParser";
@@ -12,11 +12,17 @@ import { csvToJsonArray } from "../../../utils/csvParser";
 // 파일명 파싱 유틸리티
 import { parseFileName } from "../../../utils/filenameParser";
 
-// Supabase 클라이언트 생성 (Service Role Key 사용)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
-);
+// 런타임에 Supabase 클라이언트 생성 (Service Role Key 사용)
+function getSupabase(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    throw new Error("Supabase 환경 변수가 설정되지 않았습니다.");
+  }
+  
+  return createClient(url, key);
+}
 
 /**
  * POST /api/upload
@@ -24,6 +30,7 @@ const supabase = createClient(
  */
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabase();
     // 1. FormData에서 파일 추출
     const formData = await req.formData();
     const file = formData.get("file") as File;

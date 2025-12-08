@@ -4,13 +4,19 @@
 // =====================================================
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Supabase 클라이언트 생성
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
-);
+// 런타임에 Supabase 클라이언트 생성
+function getSupabase(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    throw new Error("Supabase 환경 변수가 설정되지 않았습니다.");
+  }
+  
+  return createClient(url, key);
+}
 
 /**
  * GET /api/admin/companies
@@ -18,6 +24,7 @@ const supabase = createClient(
  */
 export async function GET() {
   try {
+    const supabase = getSupabase();
     // upload_logs에서 회사별 통계 조회
     const { data, error } = await supabase
       .from("upload_logs")
