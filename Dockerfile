@@ -52,10 +52,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# 시작 스크립트 생성
-RUN echo '#!/bin/bash' > /app/start.sh && \
-    echo 'cd /app/python-api && /app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
-    echo 'sleep 3' >> /app/start.sh && \
+# 시작 스크립트 생성 (sh 사용, 로깅 추가)
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'echo "Starting Python API server..."' >> /app/start.sh && \
+    echo 'cd /app/python-api && /app/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
+    echo 'sleep 5' >> /app/start.sh && \
+    echo 'echo "Python API started. Starting Next.js..."' >> /app/start.sh && \
     echo 'cd /app && PORT=3000 node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
 
