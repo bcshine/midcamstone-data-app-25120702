@@ -19,12 +19,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 테이블명 검증 (SQL 인젝션 방지)
-    if (!/^sales_[a-zA-Z0-9가-힣_]+$/.test(tableName)) {
+    // schema.table 형식 지원 (예: test.sales_251208_105413)
+    if (!/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/.test(tableName)) {
       return NextResponse.json(
         { error: "유효하지 않은 테이블명입니다." },
         { status: 400 }
       );
     }
+
+    // schema.table 형식 파싱
+    const [schema, table] = tableName.includes('.') 
+      ? tableName.split('.') 
+      : ['public', tableName];
 
     // 1. upload_logs에서 테이블 정보 가져오기
     const { data: logData, error: logFetchError } = await supabase
@@ -39,7 +45,7 @@ export async function DELETE(request: NextRequest) {
 
     // 2. 테이블의 모든 데이터 가져오기 (백업용)
     const { data: tableData, error: dataError } = await supabase.rpc("exec_sql", {
-      sql: `SELECT json_agg(t) as data FROM "${tableName}" t;`,
+      sql: `SELECT json_agg(t) as data FROM ${schema}."${table}" t;`,
     });
 
     let originalData = null;
@@ -68,7 +74,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 4. 원본 테이블 삭제
-    const dropTableQuery = `DROP TABLE IF EXISTS "${tableName}" CASCADE;`;
+    const dropTableQuery = `DROP TABLE IF EXISTS ${schema}."${table}" CASCADE;`;
     const { error: dropError } = await supabase.rpc("exec_sql", {
       sql: dropTableQuery,
     });
@@ -91,6 +97,20 @@ export async function DELETE(request: NextRequest) {
 
     if (logDeleteError) {
       console.error("로그 삭제 오류:", logDeleteError);
+    }
+
+    // 6. Schema에 테이블이 없으면 Schema도 삭제 (public 제외)
+    if (schema !== 'public') {
+      const { data: isEmpty } = await supabase.rpc("check_schema_empty", {
+        p_schema: schema,
+      });
+
+      // Schema가 비어있으면 삭제
+      if (isEmpty === true) {
+        const dropSchemaQuery = `DROP SCHEMA IF EXISTS ${schema} CASCADE;`;
+        await supabase.rpc("exec_sql", { sql: dropSchemaQuery });
+        console.log(`빈 Schema '${schema}' 삭제됨`);
+      }
     }
 
     return NextResponse.json({

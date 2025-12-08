@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [phone, setPhone] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +86,16 @@ export default function LoginPage() {
     setSuccess(null);
 
     // 유효성 검사
+    if (!companyName.trim()) {
+      setError("회사명을 입력해주세요.");
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError("전화번호를 입력해주세요.");
+      return;
+    }
+
     if (password !== passwordConfirm) {
       setError("비밀번호가 일치하지 않습니다.");
       return;
@@ -117,7 +128,8 @@ export default function LoginPage() {
           .insert({
             user_id: data.user.id,
             role: "client",
-            company_name: companyName || null,
+            company_name: companyName,
+            phone: phone,
           });
 
         if (roleError) {
@@ -129,6 +141,7 @@ export default function LoginPage() {
         setActiveTab("login");
         setPassword("");
         setPasswordConfirm("");
+        setPhone("");
         setCompanyName("");
       }
 
@@ -307,10 +320,27 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* 회사명 입력 (선택) */}
+              {/* 전화번호 입력 (필수) */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-slate-300 mb-2">
+                  전화번호
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="010-1234-5678"
+                  required
+                  disabled={isLoading}
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all disabled:opacity-50"
+                />
+              </div>
+
+              {/* 회사명 입력 (필수) */}
               <div>
                 <label htmlFor="company" className="block text-sm font-medium text-slate-300 mb-2">
-                  회사명 <span className="text-slate-500">(선택)</span>
+                  회사명
                 </label>
                 <input
                   id="company"
@@ -318,6 +348,7 @@ export default function LoginPage() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="예: 모찌고"
+                  required
                   disabled={isLoading}
                   className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all disabled:opacity-50"
                 />
@@ -354,7 +385,7 @@ export default function LoginPage() {
               </button>
 
               <p className="text-slate-500 text-xs text-center">
-                회원가입 시 고객사(client) 권한이 부여됩니다.
+                모든 항목은 필수입니다. 회원가입 시 고객사(client) 권한이 부여됩니다.
               </p>
             </form>
           )}

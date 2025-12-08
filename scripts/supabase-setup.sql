@@ -53,9 +53,40 @@ CREATE POLICY "upload_logs_insert_policy"
   FOR INSERT 
   WITH CHECK (true);
 
+-- 5. user_roles 테이블 생성 (사용자 역할 및 정보 관리)
+-- 회원가입 시 사용자 역할, 회사명, 전화번호 등을 저장합니다.
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'client')),
+  company_name TEXT NOT NULL,                        -- 회사명 (필수)
+  phone TEXT NOT NULL,                               -- 전화번호 (필수)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- user_roles 테이블 인덱스 추가
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id 
+  ON public.user_roles(user_id);
+
+-- 6. user_roles 테이블 RLS 설정
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+-- 인증된 사용자는 자신의 역할 조회 가능
+CREATE POLICY "user_roles_select_policy" 
+  ON public.user_roles 
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+-- 회원가입 시 자동 삽입 허용
+CREATE POLICY "user_roles_insert_policy" 
+  ON public.user_roles 
+  FOR INSERT 
+  WITH CHECK (true);
+
 -- =====================================================
 -- 설정 완료!
--- 이제 Next.js 앱에서 CSV 업로드 기능을 사용할 수 있습니다.
+-- 이제 Next.js 앱에서 CSV 업로드 및 회원가입 기능을 사용할 수 있습니다.
 -- =====================================================
 
 

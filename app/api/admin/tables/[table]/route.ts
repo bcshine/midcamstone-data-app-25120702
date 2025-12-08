@@ -32,27 +32,26 @@ export async function GET(
     const offset = (page - 1) * pageSize;
 
     // 테이블명 유효성 검사 (SQL 인젝션 방지)
-    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+    // schema.table 형식 지원
+    if (!/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/.test(tableName)) {
       return NextResponse.json(
         { error: "잘못된 테이블명입니다." },
         { status: 400 }
       );
     }
 
-    // 데이터 조회 (exec_sql 사용)
-    const { data: queryResult, error: queryError } = await supabase.rpc("exec_sql", {
-      sql: `SELECT * FROM public."${tableName}" ORDER BY id LIMIT ${pageSize} OFFSET ${offset};`
+    // schema.table 형식 파싱
+    const [schema, table] = tableName.includes('.') 
+      ? tableName.split('.') 
+      : ['public', tableName];
+
+    // get_table_data 함수를 통해 데이터 조회 (커스텀 Schema 지원)
+    const { data: result, error } = await supabase.rpc("get_table_data", {
+      p_schema: schema,
+      p_table: table,
+      p_limit: pageSize,
+      p_offset: offset
     });
-
-    // exec_sql은 결과를 반환하지 않으므로, 다른 방식 사용
-    // Supabase의 from()을 사용하되, 스키마 캐시 문제가 있을 수 있음
-    // 직접 REST API 호출 또는 다른 방식 필요
-
-    // 대안: Supabase에서 직접 조회 시도
-    const { data, error, count } = await supabase
-      .from(tableName)
-      .select("*", { count: "exact" })
-      .range(offset, offset + pageSize - 1);
 
     if (error) {
       console.error("데이터 조회 오류:", error);
@@ -61,6 +60,9 @@ export async function GET(
         { status: 500 }
       );
     }
+
+    const data = result?.data || [];
+    const count = result?.totalCount || 0;
 
     // 컬럼 정보 추출
     const columns = data && data.length > 0 ? Object.keys(data[0]) : [];
