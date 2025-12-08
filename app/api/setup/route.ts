@@ -4,22 +4,28 @@
 // =====================================================
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Service Role을 사용하는 관리자 Supabase 클라이언트
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!,
-  {
+// Service Role을 사용하는 관리자 Supabase 클라이언트 (런타임에 생성)
+function getSupabaseAdmin(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url || !serviceRoleKey) {
+    throw new Error("Supabase 환경 변수가 설정되지 않았습니다.");
+  }
+  
+  return createClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
-);
+  });
+}
 
 export async function POST(req: Request) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const { email, password, role } = await req.json();
 
     // 기본값 설정
@@ -106,6 +112,7 @@ export async function POST(req: Request) {
 // GET: 현재 설정 상태 확인
 export async function GET() {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     // 관리자 수 확인
     const { data: adminRoles, error } = await supabaseAdmin
       .from("user_roles")
