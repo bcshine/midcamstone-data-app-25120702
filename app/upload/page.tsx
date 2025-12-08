@@ -190,26 +190,26 @@ function UploadPageContent() {
   const canUpload = companyName.trim() && file && csvPreview;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8 relative">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8 relative">
       {/* 상단 네비게이션 */}
-      <div className="absolute top-8 right-8 flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-2 mb-4 md:mb-6">
         {userRole === "admin" && (
           <a
             href="/"
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+            className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
           >
             관리자 홈
           </a>
         )}
         <a
           href="/settings"
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
         >
           ⚙️ 설정
         </a>
         <button
           onClick={handleLogout}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+          className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
         >
           로그아웃
         </button>
@@ -217,15 +217,15 @@ function UploadPageContent() {
 
       <div className="max-w-4xl mx-auto">
         {/* 헤더 */}
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            중간계 온톨로지 데이터 업로드 (CSV)
+        <header className="text-center mb-6 md:mb-10">
+          <h1 className="text-xl md:text-4xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            데이터 업로드 (CSV)
           </h1>
-          <p className="text-slate-400 text-lg">
+          <p className="text-slate-400 text-sm md:text-lg">
             회사 매출 데이터를 Supabase에 저장합니다
           </p>
           {userCompany && (
-            <p className="mt-2 text-emerald-400 text-sm">🏢 {userCompany}</p>
+            <p className="mt-2 text-emerald-400 text-xs md:text-sm">🏢 {userCompany}</p>
           )}
         </header>
 

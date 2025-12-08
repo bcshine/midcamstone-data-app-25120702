@@ -80,50 +80,50 @@ function AdminDashboardContent() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* 상단 네비게이션 바 */}
-        <div className="flex items-center justify-end gap-3 mb-6">
+        <div className="flex flex-wrap items-center justify-end gap-2 mb-4 md:mb-6">
           <Link
             href="/"
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+            className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
           >
             관리자 홈
           </Link>
           <Link
             href="/admin/trash"
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+            className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
           >
             🗑️ 휴지통
           </Link>
           <Link
             href="/settings"
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+            className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
           >
             ⚙️ 설정
           </Link>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm transition-colors"
+            className="px-2 py-1.5 md:px-4 md:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-xs md:text-sm transition-colors"
           >
             로그아웃
           </button>
         </div>
 
         {/* 헤더 */}
-        <header className="mb-10">
-          <div className="flex items-center justify-between">
+        <header className="mb-6 md:mb-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
+              <h1 className="text-xl md:text-4xl font-bold mb-1 md:mb-2 bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
                 📊 고객사 데이터 관리
               </h1>
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-xs md:text-base">
                 업로드된 고객사 데이터를 확인하고 관리합니다
               </p>
             </div>
             <Link
               href="/upload"
-              className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-medium transition-colors"
+              className="px-4 py-2 md:px-6 md:py-3 bg-cyan-600 hover:bg-cyan-500 rounded-lg md:rounded-xl text-sm md:text-base font-medium transition-colors text-center whitespace-nowrap"
             >
               + 새 업로드
             </Link>
@@ -131,24 +131,24 @@ function AdminDashboardContent() {
         </header>
 
         {/* 통계 요약 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="text-3xl font-bold text-emerald-400">
+        <div className="grid grid-cols-3 gap-2 md:gap-6 mb-6 md:mb-10">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+            <div className="text-xl md:text-3xl font-bold text-emerald-400">
               {companies.length}
             </div>
-            <div className="text-slate-400 mt-1">등록된 고객사</div>
+            <div className="text-slate-400 mt-1 text-xs md:text-base">등록된 고객사</div>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="text-3xl font-bold text-cyan-400">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+            <div className="text-xl md:text-3xl font-bold text-cyan-400">
               {companies.reduce((sum, c) => sum + c.fileCount, 0)}
             </div>
-            <div className="text-slate-400 mt-1">총 업로드 파일</div>
+            <div className="text-slate-400 mt-1 text-xs md:text-base">총 업로드 파일</div>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="text-3xl font-bold text-purple-400">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+            <div className="text-xl md:text-3xl font-bold text-purple-400">
               {formatNumber(companies.reduce((sum, c) => sum + c.totalRows, 0))}
             </div>
-            <div className="text-slate-400 mt-1">총 데이터 행</div>
+            <div className="text-slate-400 mt-1 text-xs md:text-base">총 데이터 행</div>
           </div>
         </div>
 

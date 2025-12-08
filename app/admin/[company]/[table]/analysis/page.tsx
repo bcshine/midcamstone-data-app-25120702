@@ -126,10 +126,10 @@ export default function AnalysisPage({
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* 네비게이션 */}
-        <nav className="mb-6 flex items-center gap-2 text-sm">
+        <nav className="mb-4 md:mb-6 flex flex-wrap items-center gap-1 md:gap-2 text-xs md:text-sm">
           <Link
             href="/admin"
             className="text-slate-400 hover:text-cyan-400 transition-colors"
@@ -146,7 +146,7 @@ export default function AnalysisPage({
           <span className="text-slate-600">/</span>
           <Link
             href={`/admin/${encodeURIComponent(companyName)}/${encodeURIComponent(tableName)}`}
-            className="text-slate-400 hover:text-cyan-400 transition-colors"
+            className="text-slate-400 hover:text-cyan-400 transition-colors truncate max-w-[80px] md:max-w-none"
           >
             {tableName}
           </Link>
@@ -155,14 +155,14 @@ export default function AnalysisPage({
         </nav>
 
         {/* 헤더 */}
-        <header className="mb-8">
-          <div className="flex items-center justify-between">
+        <header className="mb-4 md:mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                <span className="text-4xl">📊</span>
+              <h1 className="text-xl md:text-3xl font-bold text-white mb-1 md:mb-2 flex items-center gap-2 md:gap-3">
+                <span className="text-2xl md:text-4xl">📊</span>
                 다중회귀분석
               </h1>
-              <p className="text-slate-400">
+              <p className="text-slate-400 text-xs md:text-base">
                 {companyName} - {tableName}
                 {totalRows > 0 && (
                   <span className="ml-2 text-cyan-400">
@@ -175,7 +175,7 @@ export default function AnalysisPage({
             {/* 데이터 보기 버튼 */}
             <Link
               href={`/admin/${encodeURIComponent(companyName)}/${encodeURIComponent(tableName)}`}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-medium transition-all flex items-center gap-2"
+              className="px-3 py-2 md:px-6 md:py-3 bg-slate-700 hover:bg-slate-600 rounded-lg md:rounded-xl text-sm md:text-base font-medium transition-all flex items-center gap-2 self-start"
             >
               📋 데이터 보기
             </Link>

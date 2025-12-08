@@ -106,10 +106,10 @@ export default function TableViewPage({
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* 네비게이션 */}
-        <nav className="mb-6 flex items-center gap-2 text-sm">
+        <nav className="mb-4 md:mb-6 flex flex-wrap items-center gap-1 md:gap-2 text-xs md:text-sm">
           <Link
             href="/admin"
             className="text-slate-400 hover:text-cyan-400 transition-colors"
@@ -124,16 +124,16 @@ export default function TableViewPage({
             {companyName}
           </Link>
           <span className="text-slate-600">/</span>
-          <span className="text-white">{tableName}</span>
+          <span className="text-white truncate max-w-[120px] md:max-w-none">{tableName}</span>
         </nav>
 
         {/* 헤더 */}
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-lg md:text-3xl font-bold text-white mb-1 md:mb-2">
               📋 {tableName}
             </h1>
-            <p className="text-slate-400">
+            <p className="text-slate-400 text-xs md:text-base">
               {companyName} 고객사의 데이터
               {pagination && (
                 <span className="ml-2 text-cyan-400">
@@ -147,7 +147,7 @@ export default function TableViewPage({
           {!isLoading && !error && rows.length > 0 && (
             <Link
               href={`/admin/${encodeURIComponent(companyName)}/${encodeURIComponent(tableName)}/analysis`}
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 rounded-xl font-medium transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
+              className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 rounded-lg md:rounded-xl text-sm md:text-base font-medium transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2 whitespace-nowrap self-start"
             >
               📊 회귀분석
             </Link>
