@@ -149,13 +149,13 @@ export default function CompanyDetailPage({
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* 네비게이션 */}
-        <nav className="mb-6">
+        <nav className="mb-4 md:mb-6">
           <Link
             href="/admin"
-            className="text-slate-400 hover:text-cyan-400 transition-colors"
+            className="text-slate-400 hover:text-cyan-400 transition-colors text-sm md:text-base"
           >
             ← 고객사 목록으로
           </Link>
@@ -186,16 +186,16 @@ export default function CompanyDetailPage({
         {!isLoading && !error && companyData && (
           <>
             {/* 헤더 */}
-            <header className="mb-10">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-3xl">
+            <header className="mb-6 md:mb-10">
+              <div className="flex items-center gap-3 md:gap-4 mb-4">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-2xl md:text-3xl">
                   🏢
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-white">
+                  <h1 className="text-2xl md:text-4xl font-bold text-white">
                     {companyData.companyName}
                   </h1>
-                  <p className="text-slate-400">
+                  <p className="text-slate-400 text-xs md:text-base">
                     마지막 업로드: {formatDate(companyData.lastUpload)}
                   </p>
                 </div>
@@ -203,32 +203,74 @@ export default function CompanyDetailPage({
             </header>
 
             {/* 통계 요약 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl font-bold text-emerald-400">
+            <div className="grid grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-10">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+                <div className="text-xl md:text-3xl font-bold text-emerald-400">
                   {companyData.fileCount}
                 </div>
-                <div className="text-slate-400 mt-1">업로드된 파일</div>
+                <div className="text-slate-400 mt-1 text-xs md:text-base">업로드된 파일</div>
               </div>
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl font-bold text-purple-400">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+                <div className="text-xl md:text-3xl font-bold text-purple-400">
                   {formatNumber(companyData.totalRows)}
                 </div>
-                <div className="text-slate-400 mt-1">총 데이터 행</div>
+                <div className="text-slate-400 mt-1 text-xs md:text-base">총 데이터 행</div>
               </div>
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl font-bold text-cyan-400">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 md:p-6">
+                <div className="text-xl md:text-3xl font-bold text-cyan-400">
                   {companyData.tables.length}
                 </div>
-                <div className="text-slate-400 mt-1">테이블 수</div>
+                <div className="text-slate-400 mt-1 text-xs md:text-base">테이블 수</div>
               </div>
             </div>
 
             {/* 업로드 파일 목록 */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-              <h2 className="text-xl font-bold mb-6">📁 업로드된 파일 목록</h2>
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 md:p-6">
+              <h2 className="text-lg md:text-xl font-bold mb-4 md:mb-6">📁 업로드된 파일 목록</h2>
 
-              <div className="overflow-x-auto">
+              {/* 모바일: 카드 레이아웃 */}
+              <div className="md:hidden space-y-4">
+                {companyData.tables.map((table, index) => (
+                  <div
+                    key={`mobile-${table.tableName}-${index}`}
+                    className="bg-slate-900/50 border border-slate-700 rounded-xl p-4"
+                  >
+                    <div className="font-medium text-white text-sm mb-1">
+                      {table.fileName}
+                    </div>
+                    <div className="text-xs text-slate-500 mb-3">
+                      {table.tableName}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+                      <div>
+                        <span className="text-slate-400">날짜: </span>
+                        <span className="text-slate-300">{formatFileDate(table.fileDate)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">행 수: </span>
+                        <span className="text-emerald-400 font-medium">{formatNumber(table.rowCount)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/admin/${encodeURIComponent(companyName)}/${table.tableName}`}
+                        className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-xs font-medium text-center transition-colors"
+                      >
+                        📊 데이터 보기
+                      </Link>
+                      <button
+                        onClick={() => setDeleteTarget(table.tableName)}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 데스크톱: 테이블 레이아웃 */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-600">
@@ -252,7 +294,7 @@ export default function CompanyDetailPage({
                   <tbody>
                     {companyData.tables.map((table, index) => (
                       <tr
-                        key={`${table.tableName}-${index}`}
+                        key={`desktop-${table.tableName}-${index}`}
                         className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${
                           index % 2 === 0 ? "bg-slate-900/20" : ""
                         }`}
