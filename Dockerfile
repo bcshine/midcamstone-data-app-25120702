@@ -52,4 +52,5 @@ USER nextjs
 
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# Railway가 3000번을 기대하므로, PORT를 3000으로 강제 설정
+CMD ["sh", "-c", "PORT=3000 node server.js"]
