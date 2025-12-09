@@ -13,11 +13,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MIDCAM Ontology App",
-  description: "MIDCAM 중소기업 데이터 관리 및 분석 플랫폼",
+  title: "MIDCAM 온톨로지 데이터 분석 앱",
+  description: "중간계 AI 연구소 데이터 분석 플랫폼",
   icons: {
     icon: '/icon.png',
     apple: '/apple-icon.png',
+  },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'MIDCAM',
   },
 };
 
