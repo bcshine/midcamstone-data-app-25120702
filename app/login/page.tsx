@@ -138,7 +138,7 @@ export default function LoginPage() {
           // 역할 설정 실패해도 회원가입은 성공으로 처리
         }
 
-        setSuccess("회원가입이 완료되었습니다! 로그인해주세요.");
+        setSuccess("인증 이메일이 전송되었습니다. 이메일을 확인 후 로그인해주세요.");
         setActiveTab("login");
         setPassword("");
         setPasswordConfirm("");
