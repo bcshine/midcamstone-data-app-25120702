@@ -18,14 +18,14 @@ export async function POST(req: Request) {
     const { action, ...params } = body;
 
     // 액션에 따라 다른 엔드포인트 호출
-    let endpoint = "/regression";
+    let endpoint = "/api/regression";
     
     if (action === "descriptive") {
-      endpoint = "/descriptive";
+      endpoint = "/api/descriptive";
     } else if (action === "correlation") {
-      endpoint = "/correlation";
+      endpoint = "/api/correlation";
     } else if (action === "interaction") {
-      endpoint = "/interaction";
+      endpoint = "/api/interactions";
     }
 
     // Python API로 요청 전달
