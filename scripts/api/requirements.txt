@@ -1,20 +1,21 @@
 # =====================================================
 # Python FastAPI 회귀분석 서버 의존성
+# Pre-built wheel 버전 고정 (컴파일 불필요)
 # =====================================================
 
 # 웹 프레임워크
-fastapi
-uvicorn[standard]
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
 
-# 통계 및 데이터 분석
-statsmodels
-pandas
-numpy
-scipy
-scikit-learn
+# 통계 및 데이터 분석 (manylinux wheel 제공 버전)
+numpy==1.26.3
+pandas==2.1.4
+scipy==1.11.4
+scikit-learn==1.3.2
+statsmodels==0.14.1
 
 # CORS 지원
-python-multipart
+python-multipart==0.0.6
 
 # 환경 변수
-python-dotenv
+python-dotenv==1.0.0
