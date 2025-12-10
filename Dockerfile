@@ -38,16 +38,20 @@ ENV OPENAI_API_KEY=$OPENAI_API_KEY
 ENV NODE_ENV=production
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Python 및 필수 패키지 설치
+# Python 및 필수 패키지 설치 (scikit-learn 빌드용 컴파일러 포함)
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
+    build-essential \
+    gfortran \
+    libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 가상환경 생성 및 의존성 설치
 COPY scripts/api/requirements.txt /app/python-api/requirements.txt
 RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --upgrade pip && \
     /app/venv/bin/pip install --no-cache-dir -r /app/python-api/requirements.txt
 
 # Python API 코드 복사
