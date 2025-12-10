@@ -391,7 +391,7 @@ export default function RegressionResults({
                     <div className="mt-2 text-xs text-slate-400">
                       계수: <span className={isPositive ? 'text-emerald-400' : 'text-red-400'}>{coefInfo.b.toFixed(4)}</span>
                       {' | '}
-                      p-value: <span className={isSignificant ? 'text-emerald-400' : 'text-slate-400'}>{coefInfo.p_value < 0.001 ? '<0.001' : coefInfo.p_value.toFixed(4)}</span>
+                      p-value: <span className={isSignificant ? 'text-emerald-400' : 'text-slate-400'}>{coefInfo.p_value != null && coefInfo.p_value < 0.001 ? '<0.001' : coefInfo.p_value?.toFixed(4) || "-"}</span>
                     </div>
                   )}
                 </div>
