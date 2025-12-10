@@ -1,15 +1,15 @@
 ﻿# =====================================================
-# ?뚭?遺꾩꽍 濡쒖쭅 紐⑤뱢 (?낃렇?덉씠??踰꾩쟾)
-# statsmodels瑜??ъ슜???ㅼ쨷?뚭?遺꾩꽍 援ы쁽
-# SPSS ?ㅽ???寃곌낵 異쒕젰 吏??
+# 회귀분석 로직 모듈
+# statsmodels를 사용한 다중회귀분석 구현
+# SPSS 스타일 결과 출력 지원
 # 
-# 二쇱슂 湲곕뒫:
-# - 2-way ?곹샇?묒슜 ?④낵 ?먮룞 ?앹꽦
-# - VIF > 10 蹂???먮룞 ?쒓굅 (?ㅼ쨷怨듭꽑???닿껐)
-# - Jarque-Bera ?뺢퇋??寃??
-# - ?댁긽移?遺꾩꽍 (?쒖????붿감 > 3)
-# - ?щ텇?꾩닔 (Q1, Q3) ?ы븿
-# - ?쒓굅??蹂???곸꽭 ?쒖떆
+# 주요 기능:
+# - 2-way 상호작용 효과 자동 생성
+# - VIF > 10 변수 자동 제거 (다중공선성 해결)
+# - Jarque-Bera 정규성 검정
+# - 이상치 분석 (표준화 잔차 > 3)
+# - 사분위수 (Q1, Q3) 포함
+# - 제거된 변수 상세 표시
 # =====================================================
 
 import numpy as np
@@ -27,14 +27,14 @@ warnings.filterwarnings('ignore')
 
 def safe_float(value, default=0.0) -> float:
     """
-    NaN, Inf瑜??덉쟾?섍쾶 泥섎━?섎뒗 float 蹂???⑥닔
+    NaN, Inf를 안전하게 처리하는 float 변환 함수
     
     Args:
-        value: 蹂?섑븷 媛?
-        default: 湲곕낯媛?
+        value: 변환할 값
+        default: 기본값
     
     Returns:
-        ?덉쟾?섍쾶 蹂?섎맂 float 媛?
+        안전하게 변환된 float 값
     """
     import math
     try:
@@ -48,20 +48,20 @@ def safe_float(value, default=0.0) -> float:
 
 def calculate_vif(df: pd.DataFrame, independent_vars: List[str]) -> Dict[str, float]:
     """
-    VIF (Variance Inflation Factor) 怨꾩궛
-    ?ㅼ쨷怨듭꽑??吏꾨떒???ъ슜
+    VIF (Variance Inflation Factor) 계산
+    다중공선성 진단에 사용
     
     Args:
-        df: ?곗씠?고봽?덉엫
-        independent_vars: ?낅┰蹂??紐⑸줉
+        df: 데이터프레임
+        independent_vars: 독립변수 목록
     
     Returns:
-        蹂?섎퀎 VIF ?뺤뀛?덈━
+        변수별 VIF 딕셔너리
     """
     vif_data = {}
     
     if len(independent_vars) < 2:
-        # ?낅┰蹂?섍? 1媛쒕㈃ VIF = 1
+        # 독립변수가 1개면 VIF = 1
         for var in independent_vars:
             vif_data[var] = 1.0
         return vif_data
@@ -81,15 +81,15 @@ def calculate_vif(df: pd.DataFrame, independent_vars: List[str]) -> Dict[str, fl
 def remove_multicollinearity(df: pd.DataFrame, independent_vars: List[str], 
                             threshold: float = 10.0) -> Tuple[List[str], List[str]]:
     """
-    VIF > threshold 蹂?섎? 諛섎났?곸쑝濡??쒓굅?섏뿬 ?ㅼ쨷怨듭꽑???닿껐
+    VIF > threshold 변수를 반복적으로 제거하여 다중공선성 해결
     
     Args:
-        df: ?곗씠?고봽?덉엫
-        independent_vars: ?낅┰蹂??紐⑸줉
-        threshold: VIF ?꾧퀎媛?(湲곕낯 10)
+        df: 데이터프레임
+        independent_vars: 독립변수 목록
+        threshold: VIF 임계값 (기본 10)
     
     Returns:
-        (?⑥? 蹂??紐⑸줉, ?쒓굅??蹂??紐⑸줉)
+        (남은 변수 목록, 제거된 변수 목록)
     """
     remaining_vars = independent_vars.copy()
     removed_vars = []
@@ -101,25 +101,25 @@ def remove_multicollinearity(df: pd.DataFrame, independent_vars: List[str],
         if max_vif <= threshold:
             break
         
-        # VIF媛 媛???믪? 蹂???쒓굅
+        # VIF가 가장 높은 변수 제거
         max_var = max(vif_dict, key=vif_dict.get)
         remaining_vars.remove(max_var)
         removed_vars.append(f"{max_var} (VIF={vif_dict[max_var]:.2f})")
-        print(f"  [?ㅼ쨷怨듭꽑???쒓굅] {max_var} (VIF={vif_dict[max_var]})")
+        print(f"  [다중공선성 제거] {max_var} (VIF={vif_dict[max_var]})")
     
     return remaining_vars, removed_vars
 
 
 def calculate_descriptive_stats(df: pd.DataFrame, columns: List[str]) -> List[Dict[str, Any]]:
     """
-    湲곗닠?듦퀎??怨꾩궛 (Q1, Q3 ?ы븿)
+    기술통계량 계산 (Q1, Q3 포함)
     
     Args:
-        df: ?곗씠?고봽?덉엫
-        columns: 遺꾩꽍??而щ읆 紐⑸줉
+        df: 데이터프레임
+        columns: 분석할 컬럼 목록
     
     Returns:
-        湲곗닠?듦퀎??由ъ뒪??
+        기술통계량 리스트
     """
     stats_list = []
     
@@ -134,9 +134,9 @@ def calculate_descriptive_stats(df: pd.DataFrame, columns: List[str]) -> List[Di
                     "mean": float(round(col_data.mean(), 4)),
                     "std": float(round(col_data.std(), 4)),
                     "min": float(round(col_data.min(), 4)),
-                    "q25": float(round(col_data.quantile(0.25), 4)),  # Q1 異붽?
+                    "q25": float(round(col_data.quantile(0.25), 4)),
                     "median": float(round(col_data.median(), 4)),
-                    "q75": float(round(col_data.quantile(0.75), 4)),  # Q3 異붽?
+                    "q75": float(round(col_data.quantile(0.75), 4)),
                     "max": float(round(col_data.max(), 4)),
                     "skewness": float(round(col_data.skew(), 4)),
                     "kurtosis": float(round(col_data.kurtosis(), 4))
@@ -147,25 +147,25 @@ def calculate_descriptive_stats(df: pd.DataFrame, columns: List[str]) -> List[Di
 
 def calculate_correlation_matrix(df: pd.DataFrame, columns: List[str]) -> List[Dict[str, Any]]:
     """
-    ?곴??됰젹 怨꾩궛
+    상관행렬 계산
     
     Args:
-        df: ?곗씠?고봽?덉엫
-        columns: 遺꾩꽍??而щ읆 紐⑸줉
+        df: 데이터프레임
+        columns: 분석할 컬럼 목록
     
     Returns:
-        ?곴??됰젹 由ъ뒪??
+        상관행렬 리스트
     """
-    # ?レ옄?뺤쑝濡?蹂??
+    # 숫자형으로 변환
     numeric_df = df[columns].apply(pd.to_numeric, errors='coerce').dropna()
     
     if len(numeric_df) < 3:
         return []
     
-    # ?쇱뼱???곴?怨꾩닔
+    # 피어슨 상관계수
     corr_matrix = numeric_df.corr()
     
-    # 由ъ뒪???뺥깭濡?蹂??
+    # 리스트 형태로 변환
     correlation_list = []
     for i, var1 in enumerate(columns):
         row = {"variable": var1}
@@ -184,73 +184,73 @@ def run_regression(data: List[Dict],
                    independent_vars: List[str],
                    method: str = "enter") -> Dict[str, Any]:
     """
-    ?ㅼ쨷?뚭?遺꾩꽍 ?ㅽ뻾 (superbase_link ?ㅽ????낃렇?덉씠??
+    다중회귀분석 실행
     
-    二쇱슂 湲곕뒫:
-    - 2-way ?곹샇?묒슜 ?④낵 ?먮룞 ?앹꽦
-    - VIF > 10 蹂???먮룞 ?쒓굅
-    - Jarque-Bera ?뺢퇋??寃??
-    - ?댁긽移?遺꾩꽍
-    - ?щ텇?꾩닔 ?ы븿
+    주요 기능:
+    - 2-way 상호작용 효과 자동 생성
+    - VIF > 10 변수 자동 제거
+    - Jarque-Bera 정규성 검정
+    - 이상치 분석
+    - 사분위수 포함
     
     Args:
-        data: ?곗씠??紐⑸줉 (?뺤뀛?덈━ 由ъ뒪??
-        dependent_var: 醫낆냽蹂?섎챸
-        independent_vars: ?낅┰蹂??紐⑸줉
-        method: "enter" ?먮뒗 "stepwise"
+        data: 데이터 목록 (딕셔너리 리스트)
+        dependent_var: 종속변수명
+        independent_vars: 독립변수 목록
+        method: "enter" 또는 "stepwise"
     
     Returns:
-        ?뚭?遺꾩꽍 寃곌낵 ?뺤뀛?덈━
+        회귀분석 결과 딕셔너리
     """
     try:
-        # ?곗씠?고봽?덉엫 ?앹꽦
+        # 데이터프레임 생성
         df = pd.DataFrame(data)
         
-        # 遺꾩꽍???꾩슂??而щ읆留?異붿텧
+        # 분석에 필요한 컬럼만 추출
         all_vars = [dependent_var] + independent_vars
         analysis_df = df[all_vars].copy()
         
-        # ?レ옄?뺤쑝濡?蹂??
+        # 숫자형으로 변환
         for col in all_vars:
             analysis_df[col] = pd.to_numeric(analysis_df[col], errors='coerce')
         
-        # 寃곗륫移??쒓굅
+        # 결측치 제거
         analysis_df = analysis_df.dropna()
         initial_count = len(analysis_df)
         
         if initial_count < len(independent_vars) + 2:
-            return {"error": "?곗씠?곌? 異⑸텇?섏? ?딆뒿?덈떎. 理쒖냼 (?낅┰蹂????+ 2)媛쒖쓽 ?됱씠 ?꾩슂?⑸땲??"}
+            return {"error": "데이터가 충분하지 않습니다. 최소 (독립변수 수 + 2)개의 행이 필요합니다."}
         
         # =====================================================
-        # 1?④퀎: ?ㅼ쨷怨듭꽑???쒓굅 (VIF > 10)
+        # 1단계: 다중공선성 제거 (VIF > 10)
         # =====================================================
-        print(f"\n=== {method.upper()} 諛⑹떇 ?뚭?遺꾩꽍 ===")
-        print(f"醫낆냽蹂?? {dependent_var}")
-        print(f"?낅┰蹂?? {independent_vars}")
+        print(f"\n=== {method.upper()} 방식 회귀분석 ===")
+        print(f"종속변수: {dependent_var}")
+        print(f"독립변수: {independent_vars}")
         
         final_main_vars, removed_by_vif = remove_multicollinearity(
             analysis_df, independent_vars, threshold=10
         )
         
         if len(final_main_vars) == 0:
-            return {"error": "紐⑤뱺 ?낅┰蹂?섍? ?ㅼ쨷怨듭꽑?깆쑝濡??쒓굅?섏뿀?듬땲??"}
+            return {"error": "모든 독립변수가 다중공선성으로 제거되었습니다."}
         
         # =====================================================
-        # 2?④퀎: 2-way ?곹샇?묒슜 ???앹꽦
+        # 2단계: 2-way 상호작용 항 생성
         # =====================================================
         interaction_terms = []
         if len(final_main_vars) >= 2:
             for var1, var2 in combinations(final_main_vars, 2):
-                interaction_name = f"{var1}횞{var2}"
+                interaction_name = f"{var1}*{var2}"
                 analysis_df[interaction_name] = analysis_df[var1] * analysis_df[var2]
                 interaction_terms.append(interaction_name)
-            print(f"?앹꽦???곹샇?묒슜 ?? {len(interaction_terms)}媛?)
+            print(f"생성된 상호작용 항: {len(interaction_terms)}개")
         
-        # 二쇳슚怨?+ ?곹샇?묒슜 ??
+        # 주효과 + 상호작용 항
         all_analysis_vars = final_main_vars + interaction_terms
         
         # =====================================================
-        # 3?④퀎: Stepwise 蹂???좏깮 (method媛 stepwise??寃쎌슦)
+        # 3단계: Stepwise 변수 선택 (method가 stepwise인 경우)
         # =====================================================
         removed_by_pvalue = []
         
@@ -264,8 +264,7 @@ def run_regression(data: List[Dict],
                 y = analysis_df[dependent_var]
                 model = sm.OLS(y, X).fit()
                 
-                # p-value媛 媛???믪? 蹂??李얘린 (?곸닔???쒖쇅)
-                # ?곸닔??而щ읆紐낆씠 'const' ?먮뒗 ?ㅻⅨ ?대쫫?????덉쓬
+                # p-value가 가장 높은 변수 찾기 (상수항 제외)
                 const_col = 'const' if 'const' in model.pvalues.index else model.pvalues.index[0]
                 pvalues = model.pvalues.drop(const_col)
                 max_pvalue = pvalues.max()
@@ -274,20 +273,20 @@ def run_regression(data: List[Dict],
                     var_to_remove = pvalues.idxmax()
                     current_vars.remove(var_to_remove)
                     removed_by_pvalue.append(f"{var_to_remove} (p={max_pvalue:.4f})")
-                    print(f"  [p-value ?쒓굅] {var_to_remove} (p={max_pvalue:.4f})")
+                    print(f"  [p-value 제거] {var_to_remove} (p={max_pvalue:.4f})")
                 else:
                     break
             
             if len(current_vars) == 0:
-                return {"error": "紐⑤뱺 ?낅┰蹂?섍? ?쒓굅?섏뿀?듬땲?? (p-value > 0.05)"}
+                return {"error": "모든 독립변수가 제거되었습니다. (p-value > 0.05)"}
             
             all_analysis_vars = current_vars
-            # 理쒖쥌 二쇳슚怨?蹂???낅뜲?댄듃
+            # 최종 주효과 변수 업데이트
             final_main_vars = [v for v in all_analysis_vars if v in final_main_vars]
             interaction_terms = [v for v in all_analysis_vars if v in interaction_terms]
         
         # =====================================================
-        # 4?④퀎: 理쒖쥌 ?뚭?遺꾩꽍 ?ㅽ뻾
+        # 4단계: 최종 회귀분석 실행
         # =====================================================
         X = analysis_df[all_analysis_vars]
         y = analysis_df[dependent_var]
@@ -295,26 +294,26 @@ def run_regression(data: List[Dict],
         
         model = sm.OLS(y, X_with_const).fit()
         
-        # ?곸닔??而щ읆紐??뺤씤
+        # 상수항 컬럼명 확인
         const_col = 'const' if 'const' in model.params.index else model.params.index[0]
         
-        # ?덉륫媛?諛??붿감
+        # 예측값 및 잔차
         y_pred = model.predict(X_with_const)
         residuals = y - y_pred
         
         # =====================================================
-        # 湲곗닠?듦퀎??怨꾩궛 (Q1, Q3 ?ы븿)
+        # 기술통계량 계산 (Q1, Q3 포함)
         # =====================================================
         descriptive_vars = [dependent_var] + final_main_vars
         descriptive_stats = calculate_descriptive_stats(analysis_df, descriptive_vars)
         
         # =====================================================
-        # ?곴?愿怨??됰젹
+        # 상관관계 행렬
         # =====================================================
         correlation_matrix = calculate_correlation_matrix(analysis_df, descriptive_vars)
         
         # =====================================================
-        # ANOVA ??怨꾩궛
+        # ANOVA 표 계산
         # =====================================================
         n = len(y)
         k = len(all_analysis_vars)
@@ -333,7 +332,7 @@ def run_regression(data: List[Dict],
         
         anova_table = [
             {
-                "source": "?뚭?(Regression)",
+                "source": "회귀(Regression)",
                 "ss": round(safe_float(ssr), 4),
                 "df": int(df_regression),
                 "ms": round(safe_float(msr), 4),
@@ -341,7 +340,7 @@ def run_regression(data: List[Dict],
                 "p_value": round(safe_float(model.f_pvalue), 6)
             },
             {
-                "source": "?붿감(Residual)",
+                "source": "잔차(Residual)",
                 "ss": round(safe_float(sse), 4),
                 "df": int(df_residual),
                 "ms": round(safe_float(mse), 4),
@@ -349,7 +348,7 @@ def run_regression(data: List[Dict],
                 "p_value": None
             },
             {
-                "source": "?꾩껜(Total)",
+                "source": "전체(Total)",
                 "ss": round(safe_float(sst), 4),
                 "df": int(df_total),
                 "ms": None,
@@ -359,17 +358,17 @@ def run_regression(data: List[Dict],
         ]
         
         # =====================================================
-        # ?붿감 吏꾨떒 (Jarque-Bera, ?댁긽移?遺꾩꽍 異붽?)
+        # 잔차 진단 (Jarque-Bera, 이상치 분석 추가)
         # =====================================================
         standardized_residuals = residuals / np.std(residuals)
         
-        # Jarque-Bera ?뺢퇋??寃??
+        # Jarque-Bera 정규성 검정
         jb_stat, jb_pvalue = stats.jarque_bera(residuals)
         
-        # Durbin-Watson ?먭린?곴? 寃??
+        # Durbin-Watson 자기상관 검정
         dw_stat = float(durbin_watson(residuals))
         
-        # ?댁긽移?遺꾩꽍 (?쒖????붿감 ?덈뙎媛?> 3)
+        # 이상치 분석 (표준화 잔차 절댓값 > 3)
         outliers_count = int(np.sum(np.abs(standardized_residuals) > 3))
         outliers_percent = round(outliers_count / len(residuals) * 100, 2)
         
@@ -388,22 +387,22 @@ def run_regression(data: List[Dict],
         }
         
         # =====================================================
-        # VIF 怨꾩궛 (二쇳슚怨쇰쭔)
+        # VIF 계산 (주효과만)
         # =====================================================
         vif_dict = calculate_vif(analysis_df, final_main_vars) if final_main_vars else {}
         
         # =====================================================
-        # 怨꾩닔 ?뺣낫 (?쒖???怨꾩닔 ?ы븿)
+        # 계수 정보 (표준화 계수 포함)
         # =====================================================
         std_y = y.std()
         coefficients = []
         
-        # ?곸닔??
+        # 상수항
         coefficients.append({
-            "variable": "?곸닔??,
+            "variable": "상수항",
             "b": round(safe_float(model.params[const_col]), 6),
             "std_error": round(safe_float(model.bse[const_col]), 6),
-            "beta": None,  # ?곸닔??? ?쒖???怨꾩닔 ?놁쓬
+            "beta": None,
             "t_statistic": round(safe_float(model.tvalues[const_col]), 4),
             "p_value": round(safe_float(model.pvalues[const_col]), 6),
             "tolerance": None,
@@ -411,7 +410,7 @@ def run_regression(data: List[Dict],
             "var_type": "constant"
         })
         
-        # 二쇳슚怨?
+        # 주효과
         for var in final_main_vars:
             std_x = analysis_df[var].std()
             beta = model.params[var] * (std_x / std_y) if std_y != 0 else 0
@@ -431,7 +430,7 @@ def run_regression(data: List[Dict],
                 "var_type": "main"
             })
         
-        # ?곹샇?묒슜 ??
+        # 상호작용 항
         for var in interaction_terms:
             std_x = analysis_df[var].std()
             beta = model.params[var] * (std_x / std_y) if std_y != 0 else 0
@@ -443,24 +442,24 @@ def run_regression(data: List[Dict],
                 "beta": round(safe_float(beta), 6),
                 "t_statistic": round(safe_float(model.tvalues[var]), 4),
                 "p_value": round(safe_float(model.pvalues[var]), 6),
-                "tolerance": None,  # ?곹샇?묒슜 ??? VIF 怨꾩궛 ?쒖쇅
+                "tolerance": None,
                 "vif": None,
                 "var_type": "interaction"
             })
         
         # =====================================================
-        # ?뚭????앹꽦
+        # 회귀식 생성
         # =====================================================
-        equation_parts = [f"{round(model.params[const_col], 4)} 횞 ?곸닔??]
+        equation_parts = [f"{round(model.params[const_col], 4)}"]
         for var in all_analysis_vars:
             coef = model.params[var]
             sign = "+" if coef >= 0 else "-"
-            equation_parts.append(f"{sign} {abs(round(coef, 4))} 횞 {var}")
+            equation_parts.append(f"{sign} {abs(round(coef, 4))} * {var}")
         
         regression_equation = f"Y = " + " ".join(equation_parts)
         
         # =====================================================
-        # ?ㅼ륫移??덉륫移?(泥?50媛?
+        # 실측치/예측치 (첫 50개)
         # =====================================================
         actual_vs_predicted = [
             {
@@ -473,7 +472,7 @@ def run_regression(data: List[Dict],
         ]
         
         # =====================================================
-        # ?곗젏???곗씠??(二쇱슂 蹂?섎퀎 X-Y 愿怨?
+        # 산점도 데이터 (주요 변수별 X-Y 관계)
         # =====================================================
         scatter_data = {}
         for var in final_main_vars:
@@ -486,12 +485,12 @@ def run_regression(data: List[Dict],
             ]
         
         # =====================================================
-        # ?쒓굅??蹂??紐⑸줉
+        # 제거된 변수 목록
         # =====================================================
         all_removed_vars = removed_by_vif + removed_by_pvalue
         
         # =====================================================
-        # 寃곌낵 ?댁꽍 ?앹꽦
+        # 결과 해석 생성
         # =====================================================
         interpretation = generate_interpretation(
             model, coefficients, all_removed_vars, vif_dict,
@@ -499,7 +498,7 @@ def run_regression(data: List[Dict],
         )
         
         # =====================================================
-        # 寃곌낵 諛섑솚
+        # 결과 반환
         # =====================================================
         r_multiple = float(np.sqrt(model.rsquared))
         
@@ -513,10 +512,10 @@ def run_regression(data: List[Dict],
             "interaction_terms": interaction_terms,
             "removed_vars": all_removed_vars,
             
-            # ?뚭???
+            # 회귀식
             "regression_equation": regression_equation,
             
-            # 紐⑤뜽 ?붿빟
+            # 모델 요약
             "model_summary": {
                 "r": round(r_multiple, 4),
                 "r_squared": round(safe_float(model.rsquared), 4),
@@ -530,28 +529,28 @@ def run_regression(data: List[Dict],
                 "log_likelihood": round(safe_float(model.llf), 4)
             },
             
-            # ANOVA ?뚯씠釉?
+            # ANOVA 테이블
             "anova_table": anova_table,
             
-            # 怨꾩닔
+            # 계수
             "coefficients": coefficients,
             
-            # 湲곗닠?듦퀎??(Q1, Q3 ?ы븿)
+            # 기술통계량 (Q1, Q3 포함)
             "descriptive_stats": descriptive_stats,
             
-            # ?곴??됰젹
+            # 상관행렬
             "correlation_matrix": correlation_matrix,
             
-            # ?붿감 吏꾨떒 (Jarque-Bera, ?댁긽移??ы븿)
+            # 잔차 진단 (Jarque-Bera, 이상치 포함)
             "residual_stats": residual_stats,
             
-            # ?ㅼ륫移??덉륫移?
+            # 실측치/예측치
             "actual_vs_predicted": actual_vs_predicted,
             
-            # ?곗젏???곗씠??
+            # 산점도 데이터
             "scatter_data": scatter_data,
             
-            # ?댁꽍
+            # 해석
             "interpretation": interpretation
         }
         
@@ -560,90 +559,90 @@ def run_regression(data: List[Dict],
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"error": f"遺꾩꽍 以??ㅻ쪟 諛쒖깮: {str(e)}"}
+        return {"error": f"분석 중 오류 발생: {str(e)}"}
 
 
 def generate_interpretation(model, coefficients: List[Dict], removed_vars: List[str],
                            vif_dict: Dict, final_main_vars: List[str], 
                            interaction_terms: List[str], residual_stats: Dict) -> str:
     """
-    ?뚭?遺꾩꽍 寃곌낵 ?댁꽍 ?앹꽦
+    회귀분석 결과 해석 생성
     
     Args:
-        model: ?뚭? 紐⑤뜽
-        coefficients: 怨꾩닔 ?뺣낫
-        removed_vars: ?쒓굅??蹂??
-        vif_dict: VIF ?뺤뀛?덈━
-        final_main_vars: 理쒖쥌 二쇳슚怨?蹂??
-        interaction_terms: ?곹샇?묒슜 ??
-        residual_stats: ?붿감 ?듦퀎
+        model: 회귀 모델
+        coefficients: 계수 정보
+        removed_vars: 제거된 변수
+        vif_dict: VIF 딕셔너리
+        final_main_vars: 최종 주효과 변수
+        interaction_terms: 상호작용 항
+        residual_stats: 잔차 통계
     
     Returns:
-        ?댁꽍 臾몄옄??
+        해석 문자열
     """
     interpretation = []
     
     adj_r2 = model.rsquared_adj
     
-    # 1. 紐⑤뜽 ?곹빀??
+    # 1. 모델 적합도
     if adj_r2 >= 0.7:
-        interpretation.append(f"紐⑤뜽???ㅻ챸?μ씠 留ㅼ슦 ?믪뒿?덈떎 (Adjusted R짼 = {adj_r2:.3f}).")
+        interpretation.append(f"모델의 설명력이 매우 높습니다 (Adjusted R² = {adj_r2:.3f}).")
     elif adj_r2 >= 0.5:
-        interpretation.append(f"紐⑤뜽???ㅻ챸?μ씠 ?묓샇?⑸땲??(Adjusted R짼 = {adj_r2:.3f}).")
+        interpretation.append(f"모델의 설명력이 양호합니다 (Adjusted R² = {adj_r2:.3f}).")
     else:
-        interpretation.append(f"紐⑤뜽???ㅻ챸?μ씠 ??뒿?덈떎 (Adjusted R짼 = {adj_r2:.3f}). 異붽? 蹂?섍? ?꾩슂?????덉뒿?덈떎.")
+        interpretation.append(f"모델의 설명력이 낮습니다 (Adjusted R² = {adj_r2:.3f}). 추가 변수가 필요할 수 있습니다.")
     
-    # 2. ?좎쓽??二쇳슚怨?
+    # 2. 유의한 주효과
     significant_main = [c for c in coefficients 
                        if c.get('var_type') == 'main' and c['p_value'] < 0.05]
     if significant_main:
         var_names = ', '.join([v['variable'] for v in significant_main])
-        interpretation.append(f"?좎쓽??二쇳슚怨?main effect): {var_names}.")
+        interpretation.append(f"유의한 주효과: {var_names}.")
     
-    # 3. ?좎쓽???곹샇?묒슜 ?④낵
+    # 3. 유의한 상호작용 효과
     significant_interaction = [c for c in coefficients 
                               if c.get('var_type') == 'interaction' and c['p_value'] < 0.05]
     if significant_interaction:
         int_names = ', '.join([v['variable'] for v in significant_interaction])
-        interpretation.append(f"?좎쓽???곹샇?묒슜 (interaction effect): {int_names}. 蹂?섎뱾 議곗젅?④낵媛 ?덉쓬???섎??⑸땲??")
+        interpretation.append(f"유의한 상호작용 효과: {int_names}. 변수들 간 조절효과가 있습니다.")
     
-    # 4. ?쒓굅??蹂??
+    # 4. 제거된 변수
     if removed_vars:
         removed = ', '.join(removed_vars)
-        interpretation.append(f"?쒓굅??蹂?? {removed}.")
+        interpretation.append(f"제거된 변수: {removed}.")
     
-    # 5. ?ㅼ쨷怨듭꽑??寃??
+    # 5. 다중공선성 검사
     if vif_dict and len(vif_dict) > 0:
         max_vif = max(vif_dict.values())
         if max_vif < 5:
-            interpretation.append("?ㅼ쨷怨듭꽑??臾몄젣媛 ?놁뒿?덈떎 (紐⑤뱺 VIF < 5).")
+            interpretation.append("다중공선성 문제가 없습니다 (모든 VIF < 5).")
         elif max_vif < 10:
-            interpretation.append("?ㅼ쨷怨듭꽑?깆씠 ?덉쑝???덉슜 媛?ν븳 ?섏??낅땲??(VIF < 10).")
+            interpretation.append("다중공선성이 있으나 허용 가능한 수준입니다 (VIF < 10).")
     
-    # 6. ?붿감 ?뺢퇋??寃??
+    # 6. 잔차 정규성 검정
     jb_pvalue = residual_stats.get('jarque_bera_pvalue', 1.0)
     if jb_pvalue > 0.05:
-        interpretation.append(f"?붿감媛 ?뺢퇋遺꾪룷瑜??곕쫭?덈떎 (Jarque-Bera p = {jb_pvalue:.4f}).")
+        interpretation.append(f"잔차가 정규분포를 따릅니다 (Jarque-Bera p = {jb_pvalue:.4f}).")
     else:
-        interpretation.append(f"?좑툘 ?붿감媛 ?뺢퇋遺꾪룷瑜??곕Ⅴ吏 ?딆뒿?덈떎 (Jarque-Bera p = {jb_pvalue:.4f}).")
+        interpretation.append(f"주의: 잔차가 정규분포를 따르지 않습니다 (Jarque-Bera p = {jb_pvalue:.4f}).")
     
-    # 7. ?먭린?곴? 寃??
+    # 7. 자기상관 검정
     dw = residual_stats.get('durbin_watson', 2.0)
     if 1.5 <= dw <= 2.5:
-        interpretation.append(f"?먭린?곴? 臾몄젣媛 ?놁뒿?덈떎 (Durbin-Watson = {dw:.4f}).")
+        interpretation.append(f"자기상관 문제가 없습니다 (Durbin-Watson = {dw:.4f}).")
     else:
-        interpretation.append(f"?좑툘 ?먭린?곴? 臾몄젣媛 ?덉쓣 ???덉뒿?덈떎 (Durbin-Watson = {dw:.4f}).")
+        interpretation.append(f"주의: 자기상관 문제가 있을 수 있습니다 (Durbin-Watson = {dw:.4f}).")
     
-    # 8. ?댁긽移?
+    # 8. 이상치
     outliers = residual_stats.get('outliers_count', 0)
     if outliers > 0:
-        interpretation.append(f"?좑툘 ?댁긽移?{outliers}媛?諛쒓껄 ({residual_stats.get('outliers_percent', 0):.2f}%).")
+        interpretation.append(f"주의: 이상치 {outliers}개 발견 ({residual_stats.get('outliers_percent', 0):.2f}%).")
     
-    # 9. F-?듦퀎??
+    # 9. F-통계량
     if model.f_pvalue < 0.001:
-        interpretation.append("紐⑤뜽???듦퀎?곸쑝濡?留ㅼ슦 ?좎쓽?⑸땲??(p < 0.001).")
+        interpretation.append("모델이 통계적으로 매우 유의합니다 (p < 0.001).")
     elif model.f_pvalue < 0.05:
-        interpretation.append("紐⑤뜽???듦퀎?곸쑝濡??좎쓽?⑸땲??(p < 0.05).")
+        interpretation.append("모델이 통계적으로 유의합니다 (p < 0.05).")
     
     return ' '.join(interpretation)
 
@@ -652,20 +651,20 @@ def calculate_interaction_effects(data: List[Dict],
                                    dependent_var: str,
                                    independent_vars: List[str]) -> Dict[str, Any]:
     """
-    ?곹샇?묒슜 ?④낵 怨꾩궛 (蹂꾨룄 遺꾩꽍??
+    상호작용 효과 계산 (별도 분석용)
     
     Args:
-        data: ?곗씠??紐⑸줉
-        dependent_var: 醫낆냽蹂??
-        independent_vars: ?낅┰蹂??紐⑸줉
+        data: 데이터 목록
+        dependent_var: 종속변수
+        independent_vars: 독립변수 목록
     
     Returns:
-        ?곹샇?묒슜 ?④낵 寃곌낵
+        상호작용 효과 결과
     """
     try:
         df = pd.DataFrame(data)
         
-        # ?レ옄??蹂??
+        # 숫자형 변환
         all_vars = [dependent_var] + independent_vars
         for col in all_vars:
             df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -677,17 +676,17 @@ def calculate_interaction_effects(data: List[Dict],
         
         interactions = []
         
-        # 2-way ?곹샇?묒슜留?怨꾩궛
+        # 2-way 상호작용만 계산
         for i in range(len(independent_vars)):
             for j in range(i + 1, len(independent_vars)):
                 var1 = independent_vars[i]
                 var2 = independent_vars[j]
                 
-                # ?곹샇?묒슜 ???앹꽦
-                interaction_name = f"{var1}횞{var2}"
+                # 상호작용 항 생성
+                interaction_name = f"{var1}*{var2}"
                 df[interaction_name] = df[var1] * df[var2]
                 
-                # ?곹샇?묒슜 紐⑤뜽
+                # 상호작용 모델
                 X_interaction = sm.add_constant(df[[var1, var2, interaction_name]], has_constant='add')
                 y = df[dependent_var]
                 
