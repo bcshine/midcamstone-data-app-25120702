@@ -767,19 +767,16 @@ def run_lasso_regression(data: List[Dict],
             analysis_df[col] = pd.to_numeric(analysis_df[col], errors='coerce')
         
         # =====================================================
-        # 1단계: 결측치 평균값 대체 (Lasso 전용)
+        # 1단계: 결측치 제거 (Stepwise와 동일한 방식)
         # =====================================================
         missing_info = {}
-        for col in all_vars:
-            missing_count = analysis_df[col].isna().sum()
-            if missing_count > 0:
-                col_mean = analysis_df[col].mean()
-                analysis_df[col] = analysis_df[col].fillna(col_mean)
-                missing_info[col] = {
-                    "missing_count": int(missing_count),
-                    "filled_with_mean": round(float(col_mean), 4)
-                }
-                print(f"  [결측치 처리] {col}: {missing_count}개 → 평균값({col_mean:.4f})으로 대체")
+        before_dropna = len(analysis_df)
+        analysis_df = analysis_df.dropna()
+        after_dropna = len(analysis_df)
+        
+        if before_dropna > after_dropna:
+            missing_info["removed_rows"] = before_dropna - after_dropna
+            print(f"  [결측치 처리] {before_dropna - after_dropna}개 행 제거 (결측치 포함)")
         
         initial_count = len(analysis_df)
         
