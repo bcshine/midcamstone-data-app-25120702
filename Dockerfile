@@ -1,6 +1,5 @@
 # =====================================================
 # Next.js + Python FastAPI 통합 Dockerfile
-# Pre-built wheel 사용으로 컴파일 불필요
 # =====================================================
 
 # 1단계: Node.js 의존성 설치
@@ -27,36 +26,41 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# 3단계: Python 의존성 설치 (pre-built wheel만 사용, 컴파일 불필요)
+# 3단계: Python 의존성 설치
 FROM python:3.11-slim AS python-builder
 WORKDIR /app
 
-COPY scripts/api/requirements.txt ./
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir --only-binary :all: -r requirements.txt
+# 빌드에 필요한 최소 도구 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# 4단계: 프로덕션 실행 (Node.js + Python)
-FROM node:20-slim AS runner
+# 가상환경 생성 및 의존성 설치
+COPY scripts/api/requirements.txt ./
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# 4단계: 프로덕션 실행
+FROM python:3.11-slim AS runner
 WORKDIR /app
 
-# 런타임 환경 변수 (Railway에서 전달)
+# 런타임 환경 변수
 ARG OPENAI_API_KEY
 ENV OPENAI_API_KEY=$OPENAI_API_KEY
-
 ENV NODE_ENV=production
-ENV DEBIAN_FRONTEND=noninteractive
 
-# Python 런타임만 설치
+# Node.js 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-distutils \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3 /usr/bin/python
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python 패키지 복사 (site-packages)
-COPY --from=python-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=python-builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+# Python 가상환경 복사
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Python API 코드 복사
 COPY scripts/api/*.py /app/python-api/
@@ -76,7 +80,6 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # 환경 변수 설정
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 ENV PYTHON_API_URL=http://localhost:8000
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
