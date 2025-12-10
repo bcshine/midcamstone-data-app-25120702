@@ -772,8 +772,10 @@ def run_lasso_regression(data: List[Dict],
         
         initial_count = len(analysis_df)
         
-        if initial_count < len(independent_vars) + 2:
-            return {"error": "데이터가 충분하지 않습니다. 최소 (독립변수 수 + 2)개의 행이 필요합니다."}
+        # Lasso는 p > n 상황에서도 작동 가능하므로 제약 조건 완화
+        # 단, 교차검증(CV=5)을 위해 최소 5개 이상의 데이터는 필요
+        if initial_count < 5:
+            return {"error": "데이터가 너무 적습니다. 최소 5개 이상의 행이 필요합니다."}
         
         # =====================================================
         # 2단계: 상관계수 기반 변수 필터링
