@@ -36,11 +36,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Python API 제외 (별도 컨테이너)
-scripts/api/
-
-# Python 파일
-*.py
+# Python 캐시 및 가상환경만 제외
 __pycache__/
 *.pyc
 *.pyo
