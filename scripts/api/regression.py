@@ -919,27 +919,44 @@ def run_lasso_regression(data: List[Dict],
         # =====================================================
         # 7단계: 원래 스케일의 계수 계산 (해석용)
         # =====================================================
-        # 표준화된 계수를 원래 스케일로 변환
+        # 표준화된 계수를 원래 스케일로 변환 (안전 처리)
         original_scale_coefficients = []
         
         for i, var in enumerate(filtered_vars):
             scaled_coef = lasso_coefficients[i]
             if abs(scaled_coef) > 1e-10:
-                # 원래 스케일 계수: β_original = β_scaled * (σ_y / σ_x)
-                original_coef = scaled_coef * (scaler_y.scale_[0] / scaler_X.scale_[i])
-                original_scale_coefficients.append({
-                    "variable": var,
-                    "coefficient": round(float(original_coef), 6),
-                    "coefficient_scaled": round(float(scaled_coef), 6),
-                    "correlation_with_y": correlations_with_y[var]
-                })
+                try:
+                    # 원래 스케일 계수: β_original = β_scaled * (σ_y / σ_x)
+                    if scaler_X.scale_[i] > 1e-10:
+                        original_coef = scaled_coef * (scaler_y.scale_[0] / scaler_X.scale_[i])
+                    else:
+                        original_coef = scaled_coef  # fallback
+                    original_scale_coefficients.append({
+                        "variable": var,
+                        "coefficient": round(safe_float(original_coef), 6),
+                        "coefficient_scaled": round(safe_float(scaled_coef), 6),
+                        "correlation_with_y": correlations_with_y.get(var, 0.0)
+                    })
+                except Exception as coef_err:
+                    print(f"  [계수 변환 오류] {var}: {coef_err}")
+                    original_scale_coefficients.append({
+                        "variable": var,
+                        "coefficient": round(safe_float(scaled_coef), 6),
+                        "coefficient_scaled": round(safe_float(scaled_coef), 6),
+                        "correlation_with_y": correlations_with_y.get(var, 0.0)
+                    })
         
-        # Intercept 계산
-        intercept_scaled = lasso_cv.intercept_
-        intercept = scaler_y.mean_[0] + intercept_scaled * scaler_y.scale_[0]
-        for i, var in enumerate(filtered_vars):
-            if abs(lasso_coefficients[i]) > 1e-10:
-                intercept -= (lasso_coefficients[i] * scaler_y.scale_[0] / scaler_X.scale_[i]) * scaler_X.mean_[i]
+        # Intercept 계산 (안전 처리)
+        try:
+            intercept_scaled = float(lasso_cv.intercept_)
+            intercept = scaler_y.mean_[0] + intercept_scaled * scaler_y.scale_[0]
+            for i, var in enumerate(filtered_vars):
+                if abs(lasso_coefficients[i]) > 1e-10 and scaler_X.scale_[i] > 1e-10:
+                    intercept -= (lasso_coefficients[i] * scaler_y.scale_[0] / scaler_X.scale_[i]) * scaler_X.mean_[i]
+            intercept = safe_float(intercept)
+        except Exception as intercept_err:
+            print(f"  [Intercept 계산 오류] {intercept_err}")
+            intercept = safe_float(np.mean(y_values))
         
         # =====================================================
         # 8단계: 회귀식 생성
@@ -975,17 +992,21 @@ def run_lasso_regression(data: List[Dict],
         ]
         
         # =====================================================
-        # 11단계: 산점도 데이터
+        # 11단계: 산점도 데이터 (상위 6개 변수만 - 성능 최적화)
         # =====================================================
         scatter_data = {}
-        for var in selected_vars:
-            scatter_data[var] = [
-                {
-                    "x": round(safe_float(x_val), 4),
-                    "y": round(safe_float(y_val), 4)
-                }
-                for x_val, y_val in zip(analysis_df[var].values, y_values)
-            ]
+        # 계수 절대값 기준 상위 6개 변수만 산점도 생성
+        top_vars = sorted(original_scale_coefficients, key=lambda x: abs(x['coefficient']), reverse=True)[:6]
+        for coef_info in top_vars:
+            var = coef_info['variable']
+            if var in analysis_df.columns:
+                scatter_data[var] = [
+                    {
+                        "x": round(safe_float(x_val), 4),
+                        "y": round(safe_float(y_val), 4)
+                    }
+                    for x_val, y_val in zip(analysis_df[var].values[:100], y_values[:100])  # 최대 100개 포인트
+                ]
         
         # =====================================================
         # 12단계: 잔차 통계
@@ -1040,8 +1061,8 @@ def run_lasso_regression(data: List[Dict],
             
             # 모델 요약
             "model_summary": {
-                "r": round(float(np.sqrt(r_squared)), 4),
-                "r_squared": round(float(r_squared), 4),
+                "r": round(safe_float(np.sqrt(max(0, r_squared))), 4),  # 음수 방지
+                "r_squared": round(safe_float(r_squared), 4),
                 "adj_r_squared": round(float(r_squared), 4),  # Lasso는 조정 R² 대신 CV R² 사용
                 "std_error_estimate": round(rmse, 4),
                 "mae": round(mae, 4),
