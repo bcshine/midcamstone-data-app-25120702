@@ -55,32 +55,45 @@ COPY . .
 RUN npm run build
 
 # =====================================================
-# 4단계: 프로덕션 실행 환경
+# 4단계: 프로덕션 실행 환경 (Python + Node.js)
 # =====================================================
-FROM node:20-slim AS runner
+FROM python:3.11-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PYTHONUNBUFFERED=1
 
-# 보안: non-root 사용자 생성
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Node.js 설치
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 패키지 설치
+COPY scripts/api/requirements.txt /app/scripts/api/
+RUN pip install --no-cache-dir -r /app/scripts/api/requirements.txt
 
 # 빌드된 파일 복사
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# standalone 출력물 복사
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Python API 파일 복사
+COPY scripts/api /app/scripts/api
 
-# 사용자 전환
-USER nextjs
+# 시작 스크립트 복사
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # 환경 변수 설정
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
+ENV PYTHON_API_URL="http://localhost:8000"
 
-EXPOSE 3000
+EXPOSE 3000 8000
 
-# Next.js 서버 시작
-CMD ["node", "server.js"]
+# 서버 시작 (Python API + Next.js)
+CMD ["/app/start.sh"]
