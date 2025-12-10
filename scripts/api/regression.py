@@ -714,7 +714,7 @@ def calculate_interaction_effects(data: List[Dict],
 def run_lasso_regression(data: List[Dict], 
                          dependent_var: str, 
                          independent_vars: List[str],
-                         correlation_threshold: float = 0.1) -> Dict[str, Any]:
+                         correlation_threshold: float = 0.3) -> Dict[str, Any]:
     """
     Lasso 회귀분석 실행 (L1 정규화)
     
@@ -737,12 +737,23 @@ def run_lasso_regression(data: List[Dict],
     from sklearn.linear_model import LassoCV
     from sklearn.preprocessing import StandardScaler
     from sklearn.metrics import mean_absolute_error, mean_squared_error
-    from sklearn.model_selection import cross_val_score
     
     try:
         print(f"\n=== LASSO 회귀분석 ===")
         print(f"종속변수: {dependent_var}")
-        print(f"독립변수: {independent_vars}")
+        print(f"독립변수 개수: {len(independent_vars)}")
+        
+        # =====================================================
+        # 변수가 많으면 상관계수 임계값 동적 조정
+        # =====================================================
+        MAX_VARS_FOR_LASSO = 40  # 성능을 위한 최대 변수 수
+        
+        print(f"📊 상관계수 필터링 임계값: |r| >= {correlation_threshold}")
+        
+        if len(independent_vars) > MAX_VARS_FOR_LASSO:
+            # 변수가 많으면 더 엄격한 필터링 적용
+            correlation_threshold = max(0.35, correlation_threshold)
+            print(f"⚠️ 변수가 {len(independent_vars)}개로 많음 → 상관계수 임계값 {correlation_threshold}로 조정")
         
         # 데이터프레임 생성
         df = pd.DataFrame(data)
@@ -807,6 +818,18 @@ def run_lasso_regression(data: List[Dict],
         
         if len(filtered_vars) == 0:
             return {"error": f"모든 독립변수가 상관계수 필터링으로 제거되었습니다 (임계값: {correlation_threshold})."}
+        
+        # 변수가 너무 많으면 상관계수 절대값 기준 상위 변수만 선택
+        if len(filtered_vars) > MAX_VARS_FOR_LASSO:
+            # 상관계수 절대값 기준 정렬
+            sorted_vars = sorted(filtered_vars, key=lambda v: abs(correlations_with_y.get(v, 0)), reverse=True)
+            excluded_vars = sorted_vars[MAX_VARS_FOR_LASSO:]
+            filtered_vars = sorted_vars[:MAX_VARS_FOR_LASSO]
+            
+            for v in excluded_vars:
+                removed_by_correlation.append(f"{v} (r={correlations_with_y.get(v, 0):.4f}, 상위 {MAX_VARS_FOR_LASSO}개 초과)")
+            
+            print(f"⚠️ 성능 최적화: 상위 {MAX_VARS_FOR_LASSO}개 변수만 선택 (제외: {len(excluded_vars)}개)")
         
         # =====================================================
         # 3단계: 데이터 표준화 (상수 변수 제거)
