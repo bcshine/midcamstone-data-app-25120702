@@ -1026,49 +1026,69 @@ export function resultsToText(results: RegressionResult, companyName: string): s
   text += `③ 📊 모델 적합도 요약 (Model Fit Summary)\n\n`;
   text += `회귀모델이 데이터를 얼마나 잘 설명하는지 보여주는 주요 지표입니다.\n\n`;
   text += `R² (결정계수)\t${results.model_summary.r_squared.toFixed(4)}\n`;
-  text += `Adjusted R²\t${results.model_summary.adj_r_squared.toFixed(4)}\n`;
-  text += `F-statistic\t${results.model_summary.f_statistic.toFixed(4)}\n`;
-  text += `F-statistic p-value\t${results.model_summary.f_pvalue < 0.001 ? '< 0.001' : results.model_summary.f_pvalue.toFixed(6)}\n`;
+  
+  if (results.method === "lasso") {
+    text += `CV R² (Mean)\t${results.model_summary.cv_r2_mean?.toFixed(4) || "-"}\n`;
+    text += `MAE\t${results.model_summary.mae?.toFixed(4) || "-"}\n`;
+    text += `RMSE\t${results.model_summary.rmse?.toFixed(4) || "-"}\n`;
+  } else {
+    text += `Adjusted R²\t${results.model_summary.adj_r_squared.toFixed(4)}\n`;
+    text += `F-statistic\t${results.model_summary.f_statistic?.toFixed(4) || "-"}\n`;
+    text += `F-statistic p-value\t${results.model_summary.f_pvalue != null && results.model_summary.f_pvalue < 0.001 ? '< 0.001' : results.model_summary.f_pvalue?.toFixed(6) || "-"}\n`;
+  }
   text += `관측치 수\t${results.n_observations}\n\n`;
   
-  // ANOVA
-  text += `④ 📈 ANOVA 표 (Analysis of Variance) ✅ 필수\n\n`;
-  text += `회귀모델의 전체적인 통계적 유의성을 검증합니다. F-통계량과 p-value를 통해 모델의 설명력을 판단합니다.\n\n`;
-  text += `변동 요인\t제곱합 (SS)\t자유도 (df)\t평균제곱 (MS)\tF-통계량\tp-value\n\n`;
-  results.anova_table.forEach(row => {
-    text += `${row.source}\t${row.ss.toFixed(4)}\t${row.df}\t${row.ms ? row.ms.toFixed(4) : '-'}\t${row.f ? row.f.toFixed(4) : '-'}\t${row.p_value ? (row.p_value < 0.001 ? '< 0.001' : row.p_value.toFixed(6)) : '-'}\n`;
-  });
-  text += `\n`;
+  // ANOVA (Lasso는 제외)
+  if (results.method !== "lasso") {
+    text += `④ 📈 ANOVA 표 (Analysis of Variance) ✅ 필수\n\n`;
+    text += `회귀모델의 전체적인 통계적 유의성을 검증합니다. F-통계량과 p-value를 통해 모델의 설명력을 판단합니다.\n\n`;
+    text += `변동 요인\t제곱합 (SS)\t자유도 (df)\t평균제곱 (MS)\tF-통계량\tp-value\n\n`;
+    results.anova_table.forEach(row => {
+      text += `${row.source}\t${row.ss.toFixed(4)}\t${row.df}\t${row.ms ? row.ms.toFixed(4) : '-'}\t${row.f ? row.f.toFixed(4) : '-'}\t${row.p_value != null ? (row.p_value < 0.001 ? '< 0.001' : row.p_value.toFixed(6)) : '-'}\n`;
+    });
+    text += `\n`;
+  }
   
   // 계수
-  text += `⑤ 📈 회귀계수 표 (Regression Coefficients) ✅ 필수\n\n`;
+  text += `${results.method === "lasso" ? "④" : "⑤"} 📈 회귀계수 표 (Regression Coefficients) ✅ 필수\n\n`;
   text += `각 독립변수가 종속변수에 미치는 영향력의 크기와 통계적 유의성을 나타냅니다.\n\n`;
-  text += `변수\t계수\t표준화 계수\t표준오차\tt-value\tp-value\tVIF\n\n`;
-  results.coefficients.forEach(c => {
-    const prefix = c.var_type === 'interaction' ? '🔗 ' : '';
-    text += `${prefix}${c.variable}\t${c.b.toFixed(6)}\t${c.beta !== null ? c.beta.toFixed(6) : '-'}\t${c.std_error.toFixed(6)}\t${c.t_statistic.toFixed(4)}\t${c.p_value < 0.001 ? '< 0.001' : c.p_value.toFixed(6)}\t${c.vif !== null ? c.vif.toFixed(2) : '-'}\n`;
-  });
+  
+  if (results.method === "lasso") {
+    text += `변수\t계수\t표준화 계수\n\n`;
+    results.coefficients.forEach(c => {
+      text += `${c.variable}\t${c.b.toFixed(6)}\t${c.beta !== null ? c.beta.toFixed(6) : '-'}\n`;
+    });
+  } else {
+    text += `변수\t계수\t표준화 계수\t표준오차\tt-value\tp-value\tVIF\n\n`;
+    results.coefficients.forEach(c => {
+      const prefix = c.var_type === 'interaction' ? '🔗 ' : '';
+      text += `${prefix}${c.variable}\t${c.b.toFixed(6)}\t${c.beta !== null ? c.beta.toFixed(6) : '-'}\t${c.std_error?.toFixed(6) || '-'}\t${c.t_statistic?.toFixed(4) || '-'}\t${c.p_value != null ? (c.p_value < 0.001 ? '< 0.001' : c.p_value.toFixed(6)) : '-'}\t${c.vif !== null ? c.vif?.toFixed(2) : '-'}\n`;
+    });
+  }
   text += `\n`;
   
   // 잔차 진단
-  text += `⑥ 🔍 잔차 진단 (Residual Diagnostics) 🎯 고급\n\n`;
+  text += `${results.method === "lasso" ? "⑤" : "⑥"} 🔍 잔차 진단 (Residual Diagnostics) ${results.method !== "lasso" ? "🎯 고급" : ""}\n\n`;
   text += `회귀모델의 가정 충족 여부를 검증합니다. 정규성, 등분산성, 독립성을 확인하여 모델의 신뢰성을 평가합니다.\n\n`;
   text += `📊 잔차 통계 요약\n\n`;
   text += `평균 (Mean)\t${results.residual_stats.mean.toFixed(6)}\n`;
   text += `표준편차 (Std Dev)\t${results.residual_stats.std.toFixed(4)}\n`;
   text += `최솟값 (Min)\t${results.residual_stats.min.toFixed(4)}\n`;
   text += `최댓값 (Max)\t${results.residual_stats.max.toFixed(4)}\n`;
-  text += `왜도 (Skewness)\t${results.residual_stats.skewness.toFixed(4)}\n`;
-  text += `첨도 (Kurtosis)\t${results.residual_stats.kurtosis.toFixed(4)}\n\n`;
   
-  text += `🧪 진단 검정 결과\n\n`;
-  text += `검정\t통계량\tp-value\t해석\n\n`;
-  text += `Jarque-Bera 정규성 검정\t${results.residual_stats.jarque_bera_stat.toFixed(4)}\t${results.residual_stats.jarque_bera_pvalue.toFixed(6)}\t${results.residual_stats.jarque_bera_pvalue > 0.05 ? '✅ 잔차가 정규분포를 따릅니다 (p > 0.05)' : '⚠️ 잔차가 정규분포를 따르지 않습니다 (p ≤ 0.05)'}\n`;
-  text += `Durbin-Watson 자기상관 검정\t${results.residual_stats.durbin_watson.toFixed(4)}\t-\t${results.residual_stats.durbin_watson >= 1.5 && results.residual_stats.durbin_watson <= 2.5 ? '✅ 자기상관 문제 없음 (1.5 ≤ DW ≤ 2.5)' : '⚠️ 자기상관 문제 가능성 있음'}\n\n`;
-  
-  text += `⚠️ 이상치 분석\n\n`;
-  text += `이상치 개수: ${results.residual_stats.outliers_count}개 (${results.residual_stats.outliers_percent}%)\n\n`;
-  text += `💡 표준화 잔차의 절댓값이 3을 초과하는 관측치를 이상치로 판정합니다.\n\n`;
+  if (results.method !== "lasso") {
+    text += `왜도 (Skewness)\t${results.residual_stats.skewness?.toFixed(4) || "-"}\n`;
+    text += `첨도 (Kurtosis)\t${results.residual_stats.kurtosis?.toFixed(4) || "-"}\n\n`;
+    
+    text += `🧪 진단 검정 결과\n\n`;
+    text += `검정\t통계량\tp-value\t해석\n\n`;
+    text += `Jarque-Bera 정규성 검정\t${results.residual_stats.jarque_bera_stat?.toFixed(4) || "-"}\t${results.residual_stats.jarque_bera_pvalue?.toFixed(6) || "-"}\t${(results.residual_stats.jarque_bera_pvalue ?? 0) > 0.05 ? '✅ 잔차가 정규분포를 따릅니다 (p > 0.05)' : '⚠️ 잔차가 정규분포를 따르지 않습니다 (p ≤ 0.05)'}\n`;
+    text += `Durbin-Watson 자기상관 검정\t${results.residual_stats.durbin_watson?.toFixed(4) || "-"}\t-\t${(results.residual_stats.durbin_watson ?? 2) >= 1.5 && (results.residual_stats.durbin_watson ?? 2) <= 2.5 ? '✅ 자기상관 문제 없음 (1.5 ≤ DW ≤ 2.5)' : '⚠️ 자기상관 문제 가능성 있음'}\n\n`;
+    
+    text += `⚠️ 이상치 분석\n\n`;
+    text += `이상치 개수: ${results.residual_stats.outliers_count ?? 0}개 (${results.residual_stats.outliers_percent ?? 0}%)\n\n`;
+    text += `💡 표준화 잔차의 절댓값이 3을 초과하는 관측치를 이상치로 판정합니다.\n\n`;
+  }
   
   // 제거된 변수
   if (results.removed_vars && results.removed_vars.length > 0) {
