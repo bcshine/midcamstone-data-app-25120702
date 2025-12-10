@@ -916,37 +916,31 @@ def run_lasso_regression(data: List[Dict],
             return {"error": "Lasso가 모든 변수를 제거했습니다. alpha 값이 너무 높을 수 있습니다."}
         
         # =====================================================
-        # 6단계: 예측 및 정확도 지표 계산 (Stepwise와 동일한 방식)
+        # 6단계: Lasso 선택 변수로 OLS 회귀 수행 (정석 방법)
+        # Lasso는 변수 선택용, R²는 OLS로 계산
         # =====================================================
-        from sklearn.linear_model import Lasso
         
-        # 최적 alpha로 단순 Lasso 모델 생성 및 학습
-        lasso_final = Lasso(alpha=optimal_alpha, max_iter=10000, random_state=42)
-        lasso_final.fit(X_scaled, y_scaled)
+        # Lasso로 선택된 변수로 OLS 회귀 수행
+        X_selected = analysis_df[selected_vars]
+        X_with_const = sm.add_constant(X_selected)
+        ols_model = sm.OLS(y, X_with_const).fit()
         
-        # 예측 (훈련 데이터 - Stepwise와 동일)
-        y_pred_scaled = lasso_final.predict(X_scaled)
-        y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+        # OLS 예측값
+        y_pred = ols_model.predict(X_with_const)
+        
+        # R², Adjusted R² (OLS 기준 - Stepwise와 완전히 동일)
+        r_squared = float(ols_model.rsquared)
+        adj_r_squared = float(ols_model.rsquared_adj)
         
         # MAE, RMSE 계산
         mae = float(mean_absolute_error(y_values, y_pred))
         rmse = float(np.sqrt(mean_squared_error(y_values, y_pred)))
         
-        # R² 계산 (훈련 R² - Stepwise와 동일한 기준)
-        ss_res = np.sum((y_values - y_pred) ** 2)
-        ss_tot = np.sum((y_values - np.mean(y_values)) ** 2)
-        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-        
-        # Adjusted R² 계산 (Stepwise와 동일)
-        n = len(y_values)
-        p = len(selected_vars)
-        adj_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - p - 1) if n > p + 1 else r_squared
-        
         # Lasso에서는 Adjusted R²를 주요 지표로 사용
         cv_mean = adj_r_squared
         cv_std = 0.0
         
-        print(f"R²: {r_squared:.4f}, Adjusted R²: {adj_r_squared:.4f}")
+        print(f"[Lasso+OLS] R²: {r_squared:.4f}, Adjusted R²: {adj_r_squared:.4f}")
         
         print(f"MAE: {mae:.4f}, RMSE: {rmse:.4f}, R²: {r_squared:.4f}")
         
