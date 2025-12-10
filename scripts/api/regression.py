@@ -714,7 +714,7 @@ def calculate_interaction_effects(data: List[Dict],
 def run_lasso_regression(data: List[Dict], 
                          dependent_var: str, 
                          independent_vars: List[str],
-                         correlation_threshold: float = 0.3) -> Dict[str, Any]:
+                         correlation_threshold: float = 0.1) -> Dict[str, Any]:
     """
     Lasso 회귀분석 실행 (L1 정규화)
     
@@ -752,7 +752,7 @@ def run_lasso_regression(data: List[Dict],
         
         if len(independent_vars) > MAX_VARS_FOR_LASSO:
             # 변수가 많으면 더 엄격한 필터링 적용
-            correlation_threshold = max(0.35, correlation_threshold)
+            correlation_threshold = max(0.2, correlation_threshold)
             print(f"⚠️ 변수가 {len(independent_vars)}개로 많음 → 상관계수 임계값 {correlation_threshold}로 조정")
         
         # 데이터프레임 생성
