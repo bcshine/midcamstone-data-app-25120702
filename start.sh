@@ -5,25 +5,15 @@
 # Python FastAPI + Next.js 동시 실행
 # =====================================================
 
-echo "Starting Python API server..."
+echo "=== Starting Python API server (background) ==="
 cd /app/scripts/api
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
-PYTHON_PID=$!
 
 echo "Waiting for Python API to start..."
-sleep 3
+sleep 2
 
-echo "Starting Next.js server..."
+echo "=== Starting Next.js server (foreground) ==="
 cd /app
-# Railway의 PORT 환경 변수 사용 (기본값 3000)
-PORT=${PORT:-3000} node server.js &
-NEXTJS_PID=$!
-
-echo "Both servers started successfully!"
-echo "Python API PID: $PYTHON_PID (port 8000)"
-echo "Next.js PID: $NEXTJS_PID (port $PORT)"
-
-# 두 프로세스 중 하나라도 종료되면 스크립트 종료
-wait -n
-exit $?
+# Railway의 PORT 환경 변수 사용 - exec로 포그라운드 실행
+exec node server.js
 
