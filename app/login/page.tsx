@@ -5,7 +5,7 @@
 // 탭 형태로 로그인과 회원가입을 제공합니다.
 // =====================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, getUserRole } from "../../lib/auth";
 import { supabaseBrowser } from "../../lib/supabase-browser";
@@ -23,9 +23,21 @@ export default function LoginPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [phone, setPhone] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  /**
+   * 페이지 로드 시 저장된 이메일 불러오기
+   */
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("rememberedEmail");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   /**
    * 탭 변경 핸들러
@@ -53,6 +65,13 @@ export default function LoginPage() {
         setError(result.error || "로그인에 실패했습니다.");
         setIsLoading(false);
         return;
+      }
+
+      // 자동로그인 설정
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", email);
+      } else {
+        localStorage.removeItem("rememberedEmail");
       }
 
       // 역할 조회
@@ -226,6 +245,21 @@ export default function LoginPage() {
                   disabled={isLoading}
                   className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all disabled:opacity-50"
                 />
+              </div>
+
+              {/* 자동로그인 체크박스 */}
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isLoading}
+                  className="w-4 h-4 text-cyan-500 bg-slate-900 border-slate-600 rounded focus:ring-cyan-500 focus:ring-2 disabled:opacity-50"
+                />
+                <label htmlFor="remember-me" className="ml-2 text-sm text-slate-300 cursor-pointer">
+                  로그인 상태 유지
+                </label>
               </div>
 
               {/* 성공 메시지 */}
