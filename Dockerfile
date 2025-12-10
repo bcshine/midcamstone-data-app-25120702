@@ -72,8 +72,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 패키지 설치
-COPY scripts/api/requirements.txt /app/scripts/api/
+# Python 패키지 먼저 설치 (builder에서 복사)
+COPY --from=builder /app/scripts/api/requirements.txt /app/scripts/api/
 RUN pip install --no-cache-dir -r /app/scripts/api/requirements.txt
 
 # 빌드된 파일 복사
@@ -81,11 +81,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Python API 파일 복사
-COPY scripts/api /app/scripts/api
+# Python API 파일 복사 (builder에서)
+COPY --from=builder /app/scripts/api /app/scripts/api
 
-# 시작 스크립트 복사
-COPY start.sh /app/start.sh
+# 시작 스크립트 복사 (builder에서)
+COPY --from=builder /app/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 # 환경 변수 설정
