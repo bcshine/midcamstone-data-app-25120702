@@ -325,7 +325,7 @@ export default function RegressionResults({
               // 해당 변수의 계수 정보 찾기
               const coefInfo = results.coefficients.find(c => c.variable === varName);
               const isPositive = coefInfo && coefInfo.b > 0;
-              const isSignificant = coefInfo && coefInfo.p_value < 0.05;
+              const isSignificant = coefInfo && coefInfo.p_value != null && coefInfo.p_value < 0.05;
               
               // 차트 색상 결정
               const chartColor = isSignificant 
