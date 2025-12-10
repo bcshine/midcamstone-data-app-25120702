@@ -260,12 +260,14 @@ def run_regression(data: List[Dict],
             
             # Backward Elimination
             while len(current_vars) > 0:
-                X = sm.add_constant(analysis_df[current_vars])
+                X = sm.add_constant(analysis_df[current_vars], has_constant='add')
                 y = analysis_df[dependent_var]
                 model = sm.OLS(y, X).fit()
                 
                 # p-value가 가장 높은 변수 찾기 (상수항 제외)
-                pvalues = model.pvalues.drop('const')
+                # 상수항 컬럼명이 'const' 또는 다른 이름일 수 있음
+                const_col = 'const' if 'const' in model.pvalues.index else model.pvalues.index[0]
+                pvalues = model.pvalues.drop(const_col)
                 max_pvalue = pvalues.max()
                 
                 if max_pvalue > p_threshold:
@@ -289,9 +291,12 @@ def run_regression(data: List[Dict],
         # =====================================================
         X = analysis_df[all_analysis_vars]
         y = analysis_df[dependent_var]
-        X_with_const = sm.add_constant(X)
+        X_with_const = sm.add_constant(X, has_constant='add')
         
         model = sm.OLS(y, X_with_const).fit()
+        
+        # 상수항 컬럼명 확인
+        const_col = 'const' if 'const' in model.params.index else model.params.index[0]
         
         # 예측값 및 잔차
         y_pred = model.predict(X_with_const)
@@ -396,11 +401,11 @@ def run_regression(data: List[Dict],
         # 상수항
         coefficients.append({
             "variable": "상수항",
-            "b": round(safe_float(model.params['const']), 6),
-            "std_error": round(safe_float(model.bse['const']), 6),
+            "b": round(safe_float(model.params[const_col]), 6),
+            "std_error": round(safe_float(model.bse[const_col]), 6),
             "beta": None,  # 상수항은 표준화 계수 없음
-            "t_statistic": round(safe_float(model.tvalues['const']), 4),
-            "p_value": round(safe_float(model.pvalues['const']), 6),
+            "t_statistic": round(safe_float(model.tvalues[const_col]), 4),
+            "p_value": round(safe_float(model.pvalues[const_col]), 6),
             "tolerance": None,
             "vif": None,
             "var_type": "constant"
@@ -446,7 +451,7 @@ def run_regression(data: List[Dict],
         # =====================================================
         # 회귀식 생성
         # =====================================================
-        equation_parts = [f"{round(model.params['const'], 4)} × 상수항"]
+        equation_parts = [f"{round(model.params[const_col], 4)} × 상수항"]
         for var in all_analysis_vars:
             coef = model.params[var]
             sign = "+" if coef >= 0 else "-"
@@ -683,7 +688,7 @@ def calculate_interaction_effects(data: List[Dict],
                 df[interaction_name] = df[var1] * df[var2]
                 
                 # 상호작용 모델
-                X_interaction = sm.add_constant(df[[var1, var2, interaction_name]])
+                X_interaction = sm.add_constant(df[[var1, var2, interaction_name]], has_constant='add')
                 y = df[dependent_var]
                 
                 try:
@@ -919,7 +924,7 @@ def run_lasso_regression(data: List[Dict],
         
         # Lasso로 선택된 변수로 OLS 회귀 수행
         X_selected = analysis_df[selected_vars]
-        X_with_const = sm.add_constant(X_selected)
+        X_with_const = sm.add_constant(X_selected, has_constant='add')
         ols_model = sm.OLS(y, X_with_const).fit()
         
         # OLS 예측값
