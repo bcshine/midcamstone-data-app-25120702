@@ -305,7 +305,10 @@ export default function LoginPage() {
               {/* 이메일 입력 */}
               <div>
                 <label htmlFor="signup-email" className="block text-sm font-medium text-slate-300 mb-2">
-                  이메일
+                  이메일 
+                  <span className="text-cyan-400 text-xs ml-2">
+                    ✉️ 이메일 인증을 확인하세요
+                  </span>
                 </label>
                 <input
                   id="signup-email"
