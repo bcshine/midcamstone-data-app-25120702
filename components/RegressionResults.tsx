@@ -29,7 +29,7 @@ import {
   Bar,
 } from "recharts";
 
-// 결과 타입 (업그레이드)
+// 결과 타입 (업그레이드 - Lasso 지원)
 export interface RegressionResult {
   success: boolean;
   method: string;
@@ -45,12 +45,17 @@ export interface RegressionResult {
     r_squared: number;
     adj_r_squared: number;
     std_error_estimate: number;
-    durbin_watson: number;
-    f_statistic: number;
-    f_pvalue: number;
-    aic: number;
-    bic: number;
-    log_likelihood: number;
+    durbin_watson?: number | null;
+    f_statistic?: number | null;
+    f_pvalue?: number | null;
+    aic?: number | null;
+    bic?: number | null;
+    log_likelihood?: number | null;
+    // Lasso 전용
+    mae?: number;
+    rmse?: number;
+    cv_r2_mean?: number;
+    cv_r2_std?: number;
   };
   anova_table: Array<{
     source: string;
@@ -63,12 +68,12 @@ export interface RegressionResult {
   coefficients: Array<{
     variable: string;
     b: number;
-    std_error: number;
+    std_error?: number | null;
     beta: number | null;
-    t_statistic: number;
-    p_value: number;
-    tolerance: number | null;
-    vif: number | null;
+    t_statistic?: number | null;
+    p_value?: number | null;
+    tolerance?: number | null;
+    vif?: number | null;
     var_type: string;
   }>;
   descriptive_stats: Array<{
@@ -90,13 +95,16 @@ export interface RegressionResult {
     std: number;
     min: number;
     max: number;
-    skewness: number;
-    kurtosis: number;
-    durbin_watson: number;
-    jarque_bera_stat: number;
-    jarque_bera_pvalue: number;
-    outliers_count: number;
-    outliers_percent: number;
+    skewness?: number;
+    kurtosis?: number;
+    durbin_watson?: number;
+    jarque_bera_stat?: number;
+    jarque_bera_pvalue?: number;
+    outliers_count?: number;
+    outliers_percent?: number;
+    // Lasso 전용
+    mae?: number;
+    rmse?: number;
   };
   actual_vs_predicted: Array<{
     index: number;
@@ -106,6 +114,24 @@ export interface RegressionResult {
   }>;
   scatter_data: Record<string, Array<{ x: number; y: number }>>;
   interpretation: string;
+  // Lasso 전용 결과
+  lasso_results?: {
+    optimal_alpha: number;
+    correlation_threshold: number;
+    filtered_vars_by_correlation: string[];
+    correlations_with_y: Record<string, number>;
+    selected_vars: string[];
+    zero_coefficient_vars: string[];
+    coefficients: Array<{
+      variable: string;
+      coefficient: number;
+      coefficient_scaled: number;
+      correlation_with_y: number;
+    }>;
+    intercept: number;
+    cv_r2_mean: number;
+    cv_r2_std: number;
+  };
 }
 
 interface RegressionResultsProps {
@@ -176,6 +202,112 @@ export default function RegressionResults({
           {results.regression_equation}
         </div>
       </div>
+
+      {/* =====================================================
+          Lasso 전용 결과 섹션
+          ===================================================== */}
+      {results.method === "lasso" && results.lasso_results && (
+        <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-700/50 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-purple-400 mb-4">🎯 Lasso 분석 결과</h3>
+          
+          {/* 최적 Alpha 및 정확도 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+              <p className="text-slate-400 text-xs">최적 Alpha (α)</p>
+              <p className="text-2xl font-bold text-purple-400">{results.lasso_results.optimal_alpha.toFixed(6)}</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+              <p className="text-slate-400 text-xs">MAE</p>
+              <p className="text-2xl font-bold text-cyan-400">{results.model_summary.mae?.toFixed(4) || "-"}</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+              <p className="text-slate-400 text-xs">RMSE</p>
+              <p className="text-2xl font-bold text-cyan-400">{results.model_summary.rmse?.toFixed(4) || "-"}</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+              <p className="text-slate-400 text-xs">CV R² (±std)</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                {results.lasso_results.cv_r2_mean.toFixed(4)}
+                <span className="text-sm text-slate-400"> (±{results.lasso_results.cv_r2_std.toFixed(4)})</span>
+              </p>
+            </div>
+          </div>
+
+          {/* 상관계수 필터링 결과 */}
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3">📊 상관계수 기반 필터링 후 남은 변수</h4>
+            <div className="flex flex-wrap gap-2">
+              {results.lasso_results.filtered_vars_by_correlation.map((v) => (
+                <span key={v} className="px-3 py-1 bg-slate-700/50 text-slate-300 rounded-full text-sm">
+                  {v} <span className="text-cyan-400">(r={results.lasso_results?.correlations_with_y[v]?.toFixed(3)})</span>
+                </span>
+              ))}
+            </div>
+            <p className="text-slate-500 text-xs mt-2">
+              💡 종속변수와의 상관계수가 {results.lasso_results.correlation_threshold} 이상인 변수만 포함
+            </p>
+          </div>
+
+          {/* Lasso 선택 변수 */}
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3">✅ Lasso가 선택한 최종 변수 (coefficient ≠ 0)</h4>
+            <div className="flex flex-wrap gap-2">
+              {results.lasso_results.selected_vars.map((v) => (
+                <span key={v} className="px-3 py-1 bg-emerald-900/50 text-emerald-400 rounded-full text-sm font-medium">
+                  {v}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 제외된 변수 (coefficient = 0) */}
+          {results.lasso_results.zero_coefficient_vars.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-slate-300 mb-3">❌ Lasso가 제외한 변수 (coefficient = 0)</h4>
+              <div className="flex flex-wrap gap-2">
+                {results.lasso_results.zero_coefficient_vars.map((v) => (
+                  <span key={v} className="px-3 py-1 bg-red-900/30 text-red-400 rounded-full text-sm">
+                    {v}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lasso 계수 테이블 */}
+          <div>
+            <h4 className="text-sm font-semibold text-slate-300 mb-3">📈 Lasso 계수 상세</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-600">
+                    <th className="text-left py-2 px-3 text-slate-400">변수</th>
+                    <th className="text-center py-2 px-3 text-slate-400">계수 (원래 스케일)</th>
+                    <th className="text-center py-2 px-3 text-slate-400">표준화 계수</th>
+                    <th className="text-center py-2 px-3 text-slate-400">Y와의 상관계수</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-slate-700/50 bg-slate-900/30">
+                    <td className="py-3 px-3 text-white font-medium">상수항 (Intercept)</td>
+                    <td className="py-3 px-3 text-center text-purple-400 font-bold">{results.lasso_results.intercept.toFixed(6)}</td>
+                    <td className="py-3 px-3 text-center text-slate-500">-</td>
+                    <td className="py-3 px-3 text-center text-slate-500">-</td>
+                  </tr>
+                  {results.lasso_results.coefficients.map((coef, idx) => (
+                    <tr key={idx} className="border-b border-slate-700/50">
+                      <td className="py-3 px-3 text-white font-medium">{coef.variable}</td>
+                      <td className="py-3 px-3 text-center text-purple-400 font-bold">{coef.coefficient.toFixed(6)}</td>
+                      <td className="py-3 px-3 text-center text-cyan-400">{coef.coefficient_scaled.toFixed(6)}</td>
+                      <td className="py-3 px-3 text-center text-slate-300">{coef.correlation_with_y.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           2. 주요 변수 산점도 그래프
@@ -378,72 +510,100 @@ export default function RegressionResults({
             <p className="text-2xl font-bold text-cyan-400">{formatNumber(results.model_summary.r_squared)}</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-            <p className="text-slate-400 text-xs">Adjusted R²</p>
-            <p className="text-2xl font-bold text-white">{formatNumber(results.model_summary.adj_r_squared)}</p>
-          </div>
-          <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-            <p className="text-slate-400 text-xs">F-statistic</p>
-            <p className="text-2xl font-bold text-white">{formatNumber(results.model_summary.f_statistic)}</p>
-          </div>
-          <div className="bg-slate-900/50 rounded-lg p-4 text-center">
-            <p className="text-slate-400 text-xs">F-statistic p-value</p>
-            <p className={`text-2xl font-bold ${results.model_summary.f_pvalue < 0.05 ? 'text-emerald-400' : 'text-white'}`}>
-              {formatPValue(results.model_summary.f_pvalue)}
+            <p className="text-slate-400 text-xs">{results.method === "lasso" ? "CV R²" : "Adjusted R²"}</p>
+            <p className="text-2xl font-bold text-white">
+              {results.method === "lasso" 
+                ? formatNumber(results.model_summary.cv_r2_mean)
+                : formatNumber(results.model_summary.adj_r_squared)}
             </p>
           </div>
+          {results.method === "lasso" ? (
+            <>
+              <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+                <p className="text-slate-400 text-xs">MAE</p>
+                <p className="text-2xl font-bold text-purple-400">{formatNumber(results.model_summary.mae)}</p>
+              </div>
+              <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+                <p className="text-slate-400 text-xs">RMSE</p>
+                <p className="text-2xl font-bold text-purple-400">{formatNumber(results.model_summary.rmse)}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+                <p className="text-slate-400 text-xs">F-statistic</p>
+                <p className="text-2xl font-bold text-white">{formatNumber(results.model_summary.f_statistic)}</p>
+              </div>
+              <div className="bg-slate-900/50 rounded-lg p-4 text-center">
+                <p className="text-slate-400 text-xs">F-statistic p-value</p>
+                <p className={`text-2xl font-bold ${results.model_summary.f_pvalue && results.model_summary.f_pvalue < 0.05 ? 'text-emerald-400' : 'text-white'}`}>
+                  {formatPValue(results.model_summary.f_pvalue)}
+                </p>
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-4 text-slate-500 text-xs">
           관측치 수: {results.n_observations}
+          {results.method === "lasso" && results.lasso_results && (
+            <span className="ml-4">| 선택된 변수: {results.lasso_results.selected_vars.length}개</span>
+          )}
         </div>
       </div>
 
       {/* =====================================================
-          5. ANOVA 테이블
+          5. ANOVA 테이블 (Lasso에서는 표시 안 함)
           ===================================================== */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-cyan-400 mb-2">④ 📈 ANOVA 표 (Analysis of Variance) ✅ 필수</h3>
-        <p className="text-slate-500 text-xs mb-4">
-          회귀모델의 전체적인 통계적 유의성을 검증합니다. F-통계량과 p-value를 통해 모델의 설명력을 판단합니다.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-600">
-                <th className="text-left py-2 px-3 text-slate-400">변동 요인</th>
-                <th className="text-right py-2 px-3 text-slate-400">제곱합 (SS)</th>
-                <th className="text-center py-2 px-3 text-slate-400">자유도 (df)</th>
-                <th className="text-right py-2 px-3 text-slate-400">평균제곱 (MS)</th>
-                <th className="text-right py-2 px-3 text-slate-400">F-통계량</th>
-                <th className="text-right py-2 px-3 text-slate-400">p-value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.anova_table.map((row, idx) => (
-                <tr key={idx} className="border-b border-slate-700/50">
-                  <td className="py-3 px-3 text-white">{row.source}</td>
-                  <td className="py-3 px-3 text-right text-white">{formatLargeNumber(row.ss)}</td>
-                  <td className="py-3 px-3 text-center text-white">{row.df}</td>
-                  <td className="py-3 px-3 text-right text-white">{row.ms ? formatLargeNumber(row.ms) : "-"}</td>
-                  <td className="py-3 px-3 text-right text-cyan-400 font-bold">
-                    {row.f ? formatNumber(row.f) : "-"}
-                  </td>
-                  <td className={`py-3 px-3 text-right font-bold ${row.p_value && row.p_value < 0.05 ? "text-emerald-400" : "text-white"}`}>
-                    {row.p_value ? formatPValue(row.p_value) : "-"}
-                  </td>
+      {results.method !== "lasso" && results.anova_table.length > 0 && (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-cyan-400 mb-2">④ 📈 ANOVA 표 (Analysis of Variance) ✅ 필수</h3>
+          <p className="text-slate-500 text-xs mb-4">
+            회귀모델의 전체적인 통계적 유의성을 검증합니다. F-통계량과 p-value를 통해 모델의 설명력을 판단합니다.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-600">
+                  <th className="text-left py-2 px-3 text-slate-400">변동 요인</th>
+                  <th className="text-right py-2 px-3 text-slate-400">제곱합 (SS)</th>
+                  <th className="text-center py-2 px-3 text-slate-400">자유도 (df)</th>
+                  <th className="text-right py-2 px-3 text-slate-400">평균제곱 (MS)</th>
+                  <th className="text-right py-2 px-3 text-slate-400">F-통계량</th>
+                  <th className="text-right py-2 px-3 text-slate-400">p-value</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {results.anova_table.map((row, idx) => (
+                  <tr key={idx} className="border-b border-slate-700/50">
+                    <td className="py-3 px-3 text-white">{row.source}</td>
+                    <td className="py-3 px-3 text-right text-white">{formatLargeNumber(row.ss)}</td>
+                    <td className="py-3 px-3 text-center text-white">{row.df}</td>
+                    <td className="py-3 px-3 text-right text-white">{row.ms ? formatLargeNumber(row.ms) : "-"}</td>
+                    <td className="py-3 px-3 text-right text-cyan-400 font-bold">
+                      {row.f ? formatNumber(row.f) : "-"}
+                    </td>
+                    <td className={`py-3 px-3 text-right font-bold ${row.p_value && row.p_value < 0.05 ? "text-emerald-400" : "text-white"}`}>
+                      {row.p_value ? formatPValue(row.p_value) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* =====================================================
           6. 회귀계수 표
           ===================================================== */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-cyan-400 mb-2">⑤ 📈 회귀계수 표 (Regression Coefficients) ✅ 필수</h3>
+        <h3 className="text-lg font-bold text-cyan-400 mb-2">
+          {results.method === "lasso" ? "④" : "⑤"} 📈 회귀계수 표 (Regression Coefficients) ✅ 필수
+        </h3>
         <p className="text-slate-500 text-xs mb-4">
-          각 독립변수가 종속변수에 미치는 영향력의 크기와 통계적 유의성을 나타냅니다.
+          {results.method === "lasso" 
+            ? "Lasso가 선택한 변수들의 계수입니다. 표준화 계수의 절댓값이 클수록 영향력이 큽니다."
+            : "각 독립변수가 종속변수에 미치는 영향력의 크기와 통계적 유의성을 나타냅니다."}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -452,16 +612,20 @@ export default function RegressionResults({
                 <th className="text-left py-2 px-3 text-slate-400">변수</th>
                 <th className="text-center py-2 px-3 text-slate-400">계수</th>
                 <th className="text-center py-2 px-3 text-slate-400">표준화 계수</th>
-                <th className="text-center py-2 px-3 text-slate-400">표준오차</th>
-                <th className="text-center py-2 px-3 text-slate-400">t-value</th>
-                <th className="text-center py-2 px-3 text-slate-400">p-value</th>
-                <th className="text-center py-2 px-3 text-slate-400">VIF</th>
+                {results.method !== "lasso" && (
+                  <>
+                    <th className="text-center py-2 px-3 text-slate-400">표준오차</th>
+                    <th className="text-center py-2 px-3 text-slate-400">t-value</th>
+                    <th className="text-center py-2 px-3 text-slate-400">p-value</th>
+                    <th className="text-center py-2 px-3 text-slate-400">VIF</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {results.coefficients.map((coef, idx) => {
-                const isSignificant = coef.p_value < 0.05;
-                const highVIF = coef.vif !== null && coef.vif > 10;
+                const isSignificant = coef.p_value != null && coef.p_value < 0.05;
+                const highVIF = coef.vif !== null && coef.vif !== undefined && coef.vif > 10;
                 const isInteraction = coef.var_type === 'interaction';
                 
                 return (
@@ -470,20 +634,26 @@ export default function RegressionResults({
                       {isInteraction && <span className="text-purple-400 mr-1">🔗</span>}
                       {coef.variable}
                     </td>
-                    <td className="py-3 px-3 text-center text-cyan-400 font-bold">{formatNumber(coef.b, 6)}</td>
+                    <td className={`py-3 px-3 text-center font-bold ${results.method === "lasso" ? "text-purple-400" : "text-cyan-400"}`}>
+                      {formatNumber(coef.b, 6)}
+                    </td>
                     <td className="py-3 px-3 text-center text-white">
                       {coef.beta !== null ? formatNumber(coef.beta, 6) : "-"}
                     </td>
-                    <td className="py-3 px-3 text-center text-white">{formatNumber(coef.std_error, 6)}</td>
-                    <td className="py-3 px-3 text-center text-white">{formatNumber(coef.t_statistic, 4)}</td>
-                    <td className={`py-3 px-3 text-center font-medium ${isSignificant ? "text-emerald-400" : "text-white"}`}>
-                      {formatPValue(coef.p_value)}
-                      {isSignificant && " *"}
-                    </td>
-                    <td className={`py-3 px-3 text-center ${highVIF ? "text-red-400 font-bold" : "text-white"}`}>
-                      {coef.vif !== null ? formatNumber(coef.vif, 2) : "-"}
-                      {highVIF && " ⚠️"}
-                    </td>
+                    {results.method !== "lasso" && (
+                      <>
+                        <td className="py-3 px-3 text-center text-white">{formatNumber(coef.std_error, 6)}</td>
+                        <td className="py-3 px-3 text-center text-white">{formatNumber(coef.t_statistic, 4)}</td>
+                        <td className={`py-3 px-3 text-center font-medium ${isSignificant ? "text-emerald-400" : "text-white"}`}>
+                          {formatPValue(coef.p_value)}
+                          {isSignificant && " *"}
+                        </td>
+                        <td className={`py-3 px-3 text-center ${highVIF ? "text-red-400 font-bold" : "text-white"}`}>
+                          {coef.vif !== null && coef.vif !== undefined ? formatNumber(coef.vif, 2) : "-"}
+                          {highVIF && " ⚠️"}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
@@ -491,7 +661,9 @@ export default function RegressionResults({
           </table>
         </div>
         <p className="mt-3 text-slate-500 text-xs">
-          * p &lt; 0.05 (통계적으로 유의) | 🔗 상호작용 항 | VIF &gt; 10: 다중공선성 주의
+          {results.method === "lasso" 
+            ? "💡 Lasso는 L1 정규화를 통해 불필요한 변수의 계수를 0으로 만들어 변수를 자동 선택합니다."
+            : "* p < 0.05 (통계적으로 유의) | 🔗 상호작용 항 | VIF > 10: 다중공선성 주의"}
         </p>
       </div>
 
@@ -499,9 +671,13 @@ export default function RegressionResults({
           7. 잔차 진단 (Jarque-Bera, 이상치 분석)
           ===================================================== */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-cyan-400 mb-2">⑥ 🔍 잔차 진단 (Residual Diagnostics) 🎯 고급</h3>
+        <h3 className="text-lg font-bold text-cyan-400 mb-2">
+          {results.method === "lasso" ? "⑤" : "⑥"} 🔍 잔차 진단 (Residual Diagnostics) {results.method !== "lasso" && "🎯 고급"}
+        </h3>
         <p className="text-slate-500 text-xs mb-4">
-          회귀모델의 가정 충족 여부를 검증합니다. 정규성, 등분산성, 독립성을 확인하여 모델의 신뢰성을 평가합니다.
+          {results.method === "lasso"
+            ? "예측값과 실제값의 차이(잔차)에 대한 기본 통계입니다."
+            : "회귀모델의 가정 충족 여부를 검증합니다. 정규성, 등분산성, 독립성을 확인하여 모델의 신뢰성을 평가합니다."}
         </p>
         
         {/* 잔차 통계 요약 */}
@@ -524,70 +700,89 @@ export default function RegressionResults({
               <p className="text-slate-400 text-xs">최댓값 (Max)</p>
               <p className="text-white font-mono">{formatLargeNumber(results.residual_stats.max, 4)}</p>
             </div>
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <p className="text-slate-400 text-xs">왜도 (Skewness)</p>
-              <p className="text-white font-mono">{formatNumber(results.residual_stats.skewness, 4)}</p>
-            </div>
-            <div className="bg-slate-900/50 rounded-lg p-3">
-              <p className="text-slate-400 text-xs">첨도 (Kurtosis)</p>
-              <p className="text-white font-mono">{formatNumber(results.residual_stats.kurtosis, 4)}</p>
-            </div>
+            {results.method === "lasso" ? (
+              <>
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">MAE</p>
+                  <p className="text-purple-400 font-mono font-bold">{formatNumber(results.residual_stats.mae, 4)}</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">RMSE</p>
+                  <p className="text-purple-400 font-mono font-bold">{formatNumber(results.residual_stats.rmse, 4)}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">왜도 (Skewness)</p>
+                  <p className="text-white font-mono">{formatNumber(results.residual_stats.skewness, 4)}</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">첨도 (Kurtosis)</p>
+                  <p className="text-white font-mono">{formatNumber(results.residual_stats.kurtosis, 4)}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
         
-        {/* 진단 검정 결과 */}
-        <div className="mb-6">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">🧪 진단 검정 결과</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-600">
-                  <th className="text-left py-2 px-3 text-slate-400">검정</th>
-                  <th className="text-center py-2 px-3 text-slate-400">통계량</th>
-                  <th className="text-center py-2 px-3 text-slate-400">p-value</th>
-                  <th className="text-left py-2 px-3 text-slate-400">해석</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-slate-700/50">
-                  <td className="py-3 px-3 text-white">Jarque-Bera 정규성 검정</td>
-                  <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.jarque_bera_stat, 4)}</td>
-                  <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.jarque_bera_pvalue, 6)}</td>
-                  <td className={`py-3 px-3 ${results.residual_stats.jarque_bera_pvalue > 0.05 ? "text-emerald-400" : "text-yellow-400"}`}>
-                    {results.residual_stats.jarque_bera_pvalue > 0.05 
-                      ? "✅ 잔차가 정규분포를 따릅니다 (p > 0.05)"
-                      : "⚠️ 잔차가 정규분포를 따르지 않습니다 (p ≤ 0.05)"
-                    }
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-700/50">
-                  <td className="py-3 px-3 text-white">Durbin-Watson 자기상관 검정</td>
-                  <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.durbin_watson, 4)}</td>
-                  <td className="py-3 px-3 text-center text-slate-500">-</td>
-                  <td className={`py-3 px-3 ${results.residual_stats.durbin_watson >= 1.5 && results.residual_stats.durbin_watson <= 2.5 ? "text-emerald-400" : "text-yellow-400"}`}>
-                    {results.residual_stats.durbin_watson >= 1.5 && results.residual_stats.durbin_watson <= 2.5
-                      ? "✅ 자기상관 문제 없음 (1.5 ≤ DW ≤ 2.5)"
-                      : "⚠️ 자기상관 문제 가능성 있음"
-                    }
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        {/* 진단 검정 결과 (Lasso에서는 표시 안 함) */}
+        {results.method !== "lasso" && results.residual_stats.jarque_bera_stat != null && (
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3">🧪 진단 검정 결과</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-600">
+                    <th className="text-left py-2 px-3 text-slate-400">검정</th>
+                    <th className="text-center py-2 px-3 text-slate-400">통계량</th>
+                    <th className="text-center py-2 px-3 text-slate-400">p-value</th>
+                    <th className="text-left py-2 px-3 text-slate-400">해석</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-slate-700/50">
+                    <td className="py-3 px-3 text-white">Jarque-Bera 정규성 검정</td>
+                    <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.jarque_bera_stat, 4)}</td>
+                    <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.jarque_bera_pvalue, 6)}</td>
+                    <td className={`py-3 px-3 ${(results.residual_stats.jarque_bera_pvalue ?? 0) > 0.05 ? "text-emerald-400" : "text-yellow-400"}`}>
+                      {(results.residual_stats.jarque_bera_pvalue ?? 0) > 0.05 
+                        ? "✅ 잔차가 정규분포를 따릅니다 (p > 0.05)"
+                        : "⚠️ 잔차가 정규분포를 따르지 않습니다 (p ≤ 0.05)"
+                      }
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-700/50">
+                    <td className="py-3 px-3 text-white">Durbin-Watson 자기상관 검정</td>
+                    <td className="py-3 px-3 text-center text-white">{formatNumber(results.residual_stats.durbin_watson, 4)}</td>
+                    <td className="py-3 px-3 text-center text-slate-500">-</td>
+                    <td className={`py-3 px-3 ${(results.residual_stats.durbin_watson ?? 2) >= 1.5 && (results.residual_stats.durbin_watson ?? 2) <= 2.5 ? "text-emerald-400" : "text-yellow-400"}`}>
+                      {(results.residual_stats.durbin_watson ?? 2) >= 1.5 && (results.residual_stats.durbin_watson ?? 2) <= 2.5
+                        ? "✅ 자기상관 문제 없음 (1.5 ≤ DW ≤ 2.5)"
+                        : "⚠️ 자기상관 문제 가능성 있음"
+                      }
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
         
-        {/* 이상치 분석 */}
-        <div>
-          <h4 className="text-sm font-semibold text-slate-300 mb-3">⚠️ 이상치 분석</h4>
-          <div className={`p-4 rounded-lg ${results.residual_stats.outliers_count > 0 ? "bg-yellow-900/20 border border-yellow-700/50" : "bg-emerald-900/20 border border-emerald-700/50"}`}>
-            <p className={`${results.residual_stats.outliers_count > 0 ? "text-yellow-400" : "text-emerald-400"}`}>
-              이상치 개수: {results.residual_stats.outliers_count}개 ({results.residual_stats.outliers_percent}%)
-            </p>
-            <p className="text-slate-500 text-xs mt-1">
-              💡 표준화 잔차의 절댓값이 3을 초과하는 관측치를 이상치로 판정합니다.
-            </p>
+        {/* 이상치 분석 (Lasso에서는 표시 안 함) */}
+        {results.method !== "lasso" && results.residual_stats.outliers_count != null && (
+          <div>
+            <h4 className="text-sm font-semibold text-slate-300 mb-3">⚠️ 이상치 분석</h4>
+            <div className={`p-4 rounded-lg ${results.residual_stats.outliers_count > 0 ? "bg-yellow-900/20 border border-yellow-700/50" : "bg-emerald-900/20 border border-emerald-700/50"}`}>
+              <p className={`${results.residual_stats.outliers_count > 0 ? "text-yellow-400" : "text-emerald-400"}`}>
+                이상치 개수: {results.residual_stats.outliers_count}개 ({results.residual_stats.outliers_percent}%)
+              </p>
+              <p className="text-slate-500 text-xs mt-1">
+                💡 표준화 잔차의 절댓값이 3을 초과하는 관측치를 이상치로 판정합니다.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* =====================================================

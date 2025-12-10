@@ -704,3 +704,421 @@ def calculate_interaction_effects(data: List[Dict],
         
     except Exception as e:
         return {"error": str(e)}
+
+
+# =====================================================
+# Lasso 회귀분석 (L1 정규화)
+# sklearn의 LassoCV를 사용한 자동 변수 선택
+# =====================================================
+
+def run_lasso_regression(data: List[Dict], 
+                         dependent_var: str, 
+                         independent_vars: List[str],
+                         correlation_threshold: float = 0.1) -> Dict[str, Any]:
+    """
+    Lasso 회귀분석 실행 (L1 정규화)
+    
+    주요 기능:
+    - 결측치 평균값 대체
+    - 상관계수 기반 변수 필터링
+    - LassoCV로 최적 alpha 자동 탐색
+    - coefficient가 0이 아닌 변수만 선택
+    - MAE, RMSE 정확도 지표
+    
+    Args:
+        data: 데이터 목록 (딕셔너리 리스트)
+        dependent_var: 종속변수명
+        independent_vars: 독립변수 목록
+        correlation_threshold: 상관계수 필터링 임계값 (기본 0.1)
+    
+    Returns:
+        Lasso 회귀분석 결과 딕셔너리
+    """
+    from sklearn.linear_model import LassoCV
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+    from sklearn.model_selection import cross_val_score
+    
+    try:
+        print(f"\n=== LASSO 회귀분석 ===")
+        print(f"종속변수: {dependent_var}")
+        print(f"독립변수: {independent_vars}")
+        
+        # 데이터프레임 생성
+        df = pd.DataFrame(data)
+        
+        # 분석에 필요한 컬럼만 추출
+        all_vars = [dependent_var] + independent_vars
+        analysis_df = df[all_vars].copy()
+        
+        # 숫자형으로 변환
+        for col in all_vars:
+            analysis_df[col] = pd.to_numeric(analysis_df[col], errors='coerce')
+        
+        # =====================================================
+        # 1단계: 결측치 평균값 대체 (Lasso 전용)
+        # =====================================================
+        missing_info = {}
+        for col in all_vars:
+            missing_count = analysis_df[col].isna().sum()
+            if missing_count > 0:
+                col_mean = analysis_df[col].mean()
+                analysis_df[col] = analysis_df[col].fillna(col_mean)
+                missing_info[col] = {
+                    "missing_count": int(missing_count),
+                    "filled_with_mean": round(float(col_mean), 4)
+                }
+                print(f"  [결측치 처리] {col}: {missing_count}개 → 평균값({col_mean:.4f})으로 대체")
+        
+        initial_count = len(analysis_df)
+        
+        if initial_count < len(independent_vars) + 2:
+            return {"error": "데이터가 충분하지 않습니다. 최소 (독립변수 수 + 2)개의 행이 필요합니다."}
+        
+        # =====================================================
+        # 2단계: 상관계수 기반 변수 필터링
+        # =====================================================
+        y = analysis_df[dependent_var]
+        correlations_with_y = {}
+        filtered_vars = []
+        removed_by_correlation = []
+        
+        for var in independent_vars:
+            corr = analysis_df[var].corr(y)
+            correlations_with_y[var] = round(float(corr), 4)
+            
+            if abs(corr) >= correlation_threshold:
+                filtered_vars.append(var)
+            else:
+                removed_by_correlation.append(f"{var} (r={corr:.4f})")
+                print(f"  [상관계수 필터링] {var} 제거 (r={corr:.4f} < {correlation_threshold})")
+        
+        print(f"상관계수 필터링 후 남은 변수: {len(filtered_vars)}개")
+        
+        if len(filtered_vars) == 0:
+            return {"error": f"모든 독립변수가 상관계수 필터링으로 제거되었습니다 (임계값: {correlation_threshold})."}
+        
+        # =====================================================
+        # 3단계: 데이터 표준화
+        # =====================================================
+        X = analysis_df[filtered_vars].values
+        y_values = y.values
+        
+        scaler_X = StandardScaler()
+        scaler_y = StandardScaler()
+        
+        X_scaled = scaler_X.fit_transform(X)
+        y_scaled = scaler_y.fit_transform(y_values.reshape(-1, 1)).ravel()
+        
+        # =====================================================
+        # 4단계: LassoCV로 최적 alpha 탐색 및 모델 학습
+        # =====================================================
+        # alpha 후보값 설정 (0.001 ~ 10)
+        alphas = np.logspace(-3, 1, 100)
+        
+        lasso_cv = LassoCV(
+            alphas=alphas,
+            cv=5,  # 5-fold cross-validation
+            max_iter=10000,
+            random_state=42
+        )
+        
+        lasso_cv.fit(X_scaled, y_scaled)
+        
+        optimal_alpha = float(lasso_cv.alpha_)
+        print(f"최적 alpha: {optimal_alpha:.6f}")
+        
+        # =====================================================
+        # 5단계: coefficient가 0이 아닌 변수 선택
+        # =====================================================
+        lasso_coefficients = lasso_cv.coef_
+        selected_vars = []
+        selected_coefficients = []
+        zero_vars = []
+        
+        for i, var in enumerate(filtered_vars):
+            coef = lasso_coefficients[i]
+            if abs(coef) > 1e-10:  # 0이 아닌 경우
+                selected_vars.append(var)
+                selected_coefficients.append({
+                    "variable": var,
+                    "coefficient_scaled": round(float(coef), 6),
+                    "correlation_with_y": correlations_with_y[var]
+                })
+                print(f"  [선택] {var}: coef={coef:.6f}")
+            else:
+                zero_vars.append(var)
+                print(f"  [제외] {var}: coef=0")
+        
+        print(f"Lasso 선택 변수: {len(selected_vars)}개")
+        
+        if len(selected_vars) == 0:
+            return {"error": "Lasso가 모든 변수를 제거했습니다. alpha 값이 너무 높을 수 있습니다."}
+        
+        # =====================================================
+        # 6단계: 예측 및 정확도 지표 계산
+        # =====================================================
+        y_pred_scaled = lasso_cv.predict(X_scaled)
+        y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+        
+        # MAE, RMSE 계산
+        mae = float(mean_absolute_error(y_values, y_pred))
+        rmse = float(np.sqrt(mean_squared_error(y_values, y_pred)))
+        
+        # R² 계산
+        ss_res = np.sum((y_values - y_pred) ** 2)
+        ss_tot = np.sum((y_values - np.mean(y_values)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+        
+        # Cross-validation 점수
+        cv_scores = cross_val_score(lasso_cv, X_scaled, y_scaled, cv=5, scoring='r2')
+        cv_mean = float(np.mean(cv_scores))
+        cv_std = float(np.std(cv_scores))
+        
+        print(f"MAE: {mae:.4f}, RMSE: {rmse:.4f}, R²: {r_squared:.4f}")
+        
+        # =====================================================
+        # 7단계: 원래 스케일의 계수 계산 (해석용)
+        # =====================================================
+        # 표준화된 계수를 원래 스케일로 변환
+        original_scale_coefficients = []
+        
+        for i, var in enumerate(filtered_vars):
+            scaled_coef = lasso_coefficients[i]
+            if abs(scaled_coef) > 1e-10:
+                # 원래 스케일 계수: β_original = β_scaled * (σ_y / σ_x)
+                original_coef = scaled_coef * (scaler_y.scale_[0] / scaler_X.scale_[i])
+                original_scale_coefficients.append({
+                    "variable": var,
+                    "coefficient": round(float(original_coef), 6),
+                    "coefficient_scaled": round(float(scaled_coef), 6),
+                    "correlation_with_y": correlations_with_y[var]
+                })
+        
+        # Intercept 계산
+        intercept_scaled = lasso_cv.intercept_
+        intercept = scaler_y.mean_[0] + intercept_scaled * scaler_y.scale_[0]
+        for i, var in enumerate(filtered_vars):
+            if abs(lasso_coefficients[i]) > 1e-10:
+                intercept -= (lasso_coefficients[i] * scaler_y.scale_[0] / scaler_X.scale_[i]) * scaler_X.mean_[i]
+        
+        # =====================================================
+        # 8단계: 회귀식 생성
+        # =====================================================
+        equation_parts = [f"{round(intercept, 4)}"]
+        for coef_info in original_scale_coefficients:
+            coef = coef_info['coefficient']
+            var = coef_info['variable']
+            sign = "+" if coef >= 0 else "-"
+            equation_parts.append(f"{sign} {abs(round(coef, 4))} × {var}")
+        
+        regression_equation = f"Y = " + " ".join(equation_parts)
+        
+        # =====================================================
+        # 9단계: 기술통계량 및 상관행렬
+        # =====================================================
+        descriptive_vars = [dependent_var] + selected_vars
+        descriptive_stats = calculate_descriptive_stats(analysis_df, descriptive_vars)
+        correlation_matrix = calculate_correlation_matrix(analysis_df, descriptive_vars)
+        
+        # =====================================================
+        # 10단계: 실측치/예측치 (첫 50개)
+        # =====================================================
+        residuals = y_values - y_pred
+        actual_vs_predicted = [
+            {
+                "index": i + 1,
+                "actual": round(safe_float(actual), 4),
+                "predicted": round(safe_float(pred), 4),
+                "residual": round(safe_float(res), 4)
+            }
+            for i, (actual, pred, res) in enumerate(zip(y_values[:50], y_pred[:50], residuals[:50]))
+        ]
+        
+        # =====================================================
+        # 11단계: 산점도 데이터
+        # =====================================================
+        scatter_data = {}
+        for var in selected_vars:
+            scatter_data[var] = [
+                {
+                    "x": round(safe_float(x_val), 4),
+                    "y": round(safe_float(y_val), 4)
+                }
+                for x_val, y_val in zip(analysis_df[var].values, y_values)
+            ]
+        
+        # =====================================================
+        # 12단계: 잔차 통계
+        # =====================================================
+        residual_stats = {
+            "mean": round(safe_float(np.mean(residuals)), 6),
+            "std": round(safe_float(np.std(residuals)), 4),
+            "min": round(safe_float(np.min(residuals)), 4),
+            "max": round(safe_float(np.max(residuals)), 4),
+            "mae": round(mae, 4),
+            "rmse": round(rmse, 4)
+        }
+        
+        # =====================================================
+        # 결과 해석 생성
+        # =====================================================
+        interpretation = generate_lasso_interpretation(
+            optimal_alpha, r_squared, mae, rmse,
+            selected_vars, removed_by_correlation, zero_vars,
+            original_scale_coefficients, cv_mean, cv_std
+        )
+        
+        # =====================================================
+        # 결과 반환
+        # =====================================================
+        result = {
+            "success": True,
+            "method": "lasso",
+            "n_observations": int(initial_count),
+            "dependent_variable": dependent_var,
+            "independent_variables": selected_vars,
+            "final_main_vars": selected_vars,
+            "interaction_terms": [],  # Lasso는 상호작용 항 미생성
+            "removed_vars": removed_by_correlation + [f"{v} (Lasso 제외)" for v in zero_vars],
+            
+            # 회귀식
+            "regression_equation": regression_equation,
+            
+            # Lasso 전용 결과
+            "lasso_results": {
+                "optimal_alpha": round(optimal_alpha, 6),
+                "correlation_threshold": correlation_threshold,
+                "filtered_vars_by_correlation": filtered_vars,
+                "correlations_with_y": correlations_with_y,
+                "selected_vars": selected_vars,
+                "zero_coefficient_vars": zero_vars,
+                "coefficients": original_scale_coefficients,
+                "intercept": round(float(intercept), 6),
+                "cv_r2_mean": round(cv_mean, 4),
+                "cv_r2_std": round(cv_std, 4)
+            },
+            
+            # 모델 요약
+            "model_summary": {
+                "r": round(float(np.sqrt(r_squared)), 4),
+                "r_squared": round(float(r_squared), 4),
+                "adj_r_squared": round(float(r_squared), 4),  # Lasso는 조정 R² 대신 CV R² 사용
+                "std_error_estimate": round(rmse, 4),
+                "mae": round(mae, 4),
+                "rmse": round(rmse, 4),
+                "cv_r2_mean": round(cv_mean, 4),
+                "cv_r2_std": round(cv_std, 4),
+                "f_statistic": None,  # Lasso는 F-통계량 미제공
+                "f_pvalue": None,
+                "aic": None,
+                "bic": None,
+                "log_likelihood": None,
+                "durbin_watson": None
+            },
+            
+            # ANOVA (Lasso는 제공하지 않음)
+            "anova_table": [],
+            
+            # 계수 (Lasso 스타일)
+            "coefficients": [
+                {
+                    "variable": "상수항",
+                    "b": round(float(intercept), 6),
+                    "std_error": None,
+                    "beta": None,
+                    "t_statistic": None,
+                    "p_value": None,
+                    "tolerance": None,
+                    "vif": None,
+                    "var_type": "constant"
+                }
+            ] + [
+                {
+                    "variable": c["variable"],
+                    "b": c["coefficient"],
+                    "std_error": None,
+                    "beta": c["coefficient_scaled"],  # 표준화 계수
+                    "t_statistic": None,
+                    "p_value": None,
+                    "tolerance": None,
+                    "vif": None,
+                    "var_type": "main"
+                }
+                for c in original_scale_coefficients
+            ],
+            
+            # 기술통계량
+            "descriptive_stats": descriptive_stats,
+            
+            # 상관행렬
+            "correlation_matrix": correlation_matrix,
+            
+            # 잔차 통계
+            "residual_stats": residual_stats,
+            
+            # 실측치/예측치
+            "actual_vs_predicted": actual_vs_predicted,
+            
+            # 산점도 데이터
+            "scatter_data": scatter_data,
+            
+            # 결측치 처리 정보
+            "missing_value_info": missing_info,
+            
+            # 해석
+            "interpretation": interpretation
+        }
+        
+        return result
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Lasso 분석 중 오류 발생: {str(e)}"}
+
+
+def generate_lasso_interpretation(optimal_alpha: float, r_squared: float,
+                                   mae: float, rmse: float,
+                                   selected_vars: List[str],
+                                   removed_by_correlation: List[str],
+                                   zero_vars: List[str],
+                                   coefficients: List[Dict],
+                                   cv_mean: float, cv_std: float) -> str:
+    """
+    Lasso 회귀분석 결과 해석 생성
+    """
+    interpretation = []
+    
+    # 1. 모델 설명력
+    if r_squared >= 0.7:
+        interpretation.append(f"Lasso 모델의 설명력이 매우 높습니다 (R² = {r_squared:.3f}).")
+    elif r_squared >= 0.5:
+        interpretation.append(f"Lasso 모델의 설명력이 양호합니다 (R² = {r_squared:.3f}).")
+    else:
+        interpretation.append(f"Lasso 모델의 설명력이 낮습니다 (R² = {r_squared:.3f}). 추가 변수가 필요할 수 있습니다.")
+    
+    # 2. 최적 alpha
+    interpretation.append(f"최적 정규화 강도: α = {optimal_alpha:.6f}.")
+    
+    # 3. 변수 선택 결과
+    interpretation.append(f"Lasso가 {len(selected_vars)}개 변수를 선택했습니다: {', '.join(selected_vars)}.")
+    
+    # 4. 제거된 변수
+    total_removed = len(removed_by_correlation) + len(zero_vars)
+    if total_removed > 0:
+        interpretation.append(f"총 {total_removed}개 변수가 제거되었습니다 (상관계수 필터링: {len(removed_by_correlation)}개, Lasso 제외: {len(zero_vars)}개).")
+    
+    # 5. 예측 정확도
+    interpretation.append(f"예측 정확도: MAE = {mae:.4f}, RMSE = {rmse:.4f}.")
+    
+    # 6. 교차검증 결과
+    interpretation.append(f"5-Fold 교차검증 R²: {cv_mean:.4f} (±{cv_std:.4f}).")
+    
+    # 7. 주요 영향 변수
+    if coefficients:
+        sorted_coefs = sorted(coefficients, key=lambda x: abs(x['coefficient_scaled']), reverse=True)
+        top_vars = [c['variable'] for c in sorted_coefs[:3]]
+        interpretation.append(f"가장 영향력 있는 변수: {', '.join(top_vars)}.")
+    
+    return ' '.join(interpretation)

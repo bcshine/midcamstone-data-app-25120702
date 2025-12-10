@@ -12,6 +12,7 @@ import uvicorn
 
 from regression import (
     run_regression,
+    run_lasso_regression,
     calculate_descriptive_stats,
     calculate_correlation_matrix,
     calculate_interaction_effects
@@ -47,7 +48,7 @@ class RegressionRequest(BaseModel):
     data: List[Dict[str, Any]]  # 데이터 목록
     dependent_var: str          # 종속변수
     independent_vars: List[str] # 독립변수 목록
-    method: str = "enter"       # "enter" 또는 "stepwise"
+    method: str = "enter"       # "enter", "stepwise", 또는 "lasso"
 
 
 class DescriptiveRequest(BaseModel):
@@ -101,6 +102,7 @@ async def regression_analysis(request: RegressionRequest):
     
     - Enter 방식: 모든 독립변수 포함
     - Stepwise 방식: 단계적 변수 선택
+    - Lasso 방식: L1 정규화로 중요 변수 자동 선택
     """
     # 유효성 검사
     if not request.data:
@@ -112,16 +114,24 @@ async def regression_analysis(request: RegressionRequest):
     if not request.independent_vars or len(request.independent_vars) == 0:
         raise HTTPException(status_code=400, detail="독립변수를 하나 이상 선택해주세요.")
     
-    if request.method not in ["enter", "stepwise"]:
-        raise HTTPException(status_code=400, detail="method는 'enter' 또는 'stepwise'여야 합니다.")
+    if request.method not in ["enter", "stepwise", "lasso"]:
+        raise HTTPException(status_code=400, detail="method는 'enter', 'stepwise', 또는 'lasso'여야 합니다.")
     
-    # 회귀분석 실행
-    result = run_regression(
-        data=request.data,
-        dependent_var=request.dependent_var,
-        independent_vars=request.independent_vars,
-        method=request.method
-    )
+    # Lasso 회귀분석
+    if request.method == "lasso":
+        result = run_lasso_regression(
+            data=request.data,
+            dependent_var=request.dependent_var,
+            independent_vars=request.independent_vars
+        )
+    else:
+        # Enter 또는 Stepwise 회귀분석
+        result = run_regression(
+            data=request.data,
+            dependent_var=request.dependent_var,
+            independent_vars=request.independent_vars,
+            method=request.method
+        )
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

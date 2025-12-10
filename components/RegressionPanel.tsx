@@ -20,7 +20,7 @@ interface RegressionPanelProps {
 export interface AnalysisParams {
   dependentVar: string;
   independentVars: string[];
-  method: "enter" | "stepwise";
+  method: "enter" | "stepwise" | "lasso";
   data: Record<string, any>[];
 }
 
@@ -34,7 +34,7 @@ export default function RegressionPanel({
   // 상태 관리
   const [dependentVar, setDependentVar] = useState<string>("");
   const [independentVars, setIndependentVars] = useState<string[]>([]);
-  const [method, setMethod] = useState<"enter" | "stepwise">("enter");
+  const [method, setMethod] = useState<"enter" | "stepwise" | "lasso">("enter");
 
   // 숫자형 컬럼만 필터링 (id 제외)
   const numericColumns = useMemo(() => {
@@ -225,6 +225,23 @@ export default function RegressionPanel({
                   </p>
                 </div>
               </label>
+              
+              <label className="flex items-center gap-3 p-3 bg-slate-900 border border-purple-600/50 rounded-xl cursor-pointer hover:border-purple-500">
+                <input
+                  type="radio"
+                  name="method"
+                  value="lasso"
+                  checked={method === "lasso"}
+                  onChange={() => setMethod("lasso")}
+                  className="w-4 h-4 text-purple-500 focus:ring-purple-500"
+                />
+                <div>
+                  <span className="text-white font-medium">Lasso (L1 정규화)</span>
+                  <p className="text-slate-400 text-xs">
+                    L1 정규화로 중요 변수 자동 선택
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -246,8 +263,8 @@ export default function RegressionPanel({
               </p>
               <p className="text-slate-300">
                 <span className="text-slate-500">방법:</span>{" "}
-                <span className="text-cyan-400">
-                  {method === "enter" ? "Enter" : "Stepwise"}
+                <span className={method === "lasso" ? "text-purple-400" : "text-cyan-400"}>
+                  {method === "enter" ? "Enter" : method === "stepwise" ? "Stepwise" : "Lasso"}
                 </span>
               </p>
             </div>
