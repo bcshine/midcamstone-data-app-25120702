@@ -1,38 +1,27 @@
 # =====================================================
-# Python FastAPI 회귀분석 서버 Dockerfile
+# Python FastAPI 전용 Dockerfile
+# 별도 Railway 서비스로 배포
 # =====================================================
 
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 시스템 의존성 설치 (scipy, numpy 빌드에 필요)
-RUN apt-get update && apt-get install -y \
+# 빌드 도구 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 설치
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 의존성 설치
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 복사
-COPY . .
+# 코드 복사
+COPY *.py ./
 
-# 환경 변수
-ENV PYTHONUNBUFFERED=1
-
-# Railway에서 PORT 환경 변수를 자동 설정
 ENV PORT=8000
 
 EXPOSE 8000
 
-# uvicorn으로 FastAPI 실행
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
-
-
-
-
-
-
-
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
