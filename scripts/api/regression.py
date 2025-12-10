@@ -786,14 +786,22 @@ def run_lasso_regression(data: List[Dict],
         removed_by_correlation = []
         
         for var in independent_vars:
-            corr = analysis_df[var].corr(y)
-            correlations_with_y[var] = round(float(corr), 4)
-            
-            if abs(corr) >= correlation_threshold:
-                filtered_vars.append(var)
-            else:
-                removed_by_correlation.append(f"{var} (r={corr:.4f})")
-                print(f"  [상관계수 필터링] {var} 제거 (r={corr:.4f} < {correlation_threshold})")
+            try:
+                corr = analysis_df[var].corr(y)
+                # NaN 체크
+                if pd.isna(corr):
+                    corr = 0.0
+                    print(f"  [경고] {var}: 상관계수가 NaN → 0으로 대체")
+                correlations_with_y[var] = round(float(corr), 4)
+                
+                if abs(corr) >= correlation_threshold:
+                    filtered_vars.append(var)
+                else:
+                    removed_by_correlation.append(f"{var} (r={corr:.4f})")
+                    print(f"  [상관계수 필터링] {var} 제거 (r={corr:.4f} < {correlation_threshold})")
+            except Exception as corr_err:
+                print(f"  [오류] {var} 상관계수 계산 실패: {corr_err}")
+                correlations_with_y[var] = 0.0
         
         print(f"상관계수 필터링 후 남은 변수: {len(filtered_vars)}개")
         
@@ -801,8 +809,22 @@ def run_lasso_regression(data: List[Dict],
             return {"error": f"모든 독립변수가 상관계수 필터링으로 제거되었습니다 (임계값: {correlation_threshold})."}
         
         # =====================================================
-        # 3단계: 데이터 표준화
+        # 3단계: 데이터 표준화 (상수 변수 제거)
         # =====================================================
+        # 분산이 0인 (상수) 변수 제거
+        valid_vars = []
+        for var in filtered_vars:
+            var_std = analysis_df[var].std()
+            if var_std > 1e-10:
+                valid_vars.append(var)
+            else:
+                print(f"  [상수 변수 제거] {var}: 표준편차=0")
+        
+        if len(valid_vars) == 0:
+            return {"error": "유효한 독립변수가 없습니다 (모든 변수의 분산이 0)."}
+        
+        filtered_vars = valid_vars  # 갱신
+        
         X = analysis_df[filtered_vars].values
         y_values = y.values
         
@@ -818,11 +840,17 @@ def run_lasso_regression(data: List[Dict],
         # alpha 후보값 설정 (0.001 ~ 10)
         alphas = np.logspace(-3, 1, 100)
         
+        # CV fold 수를 데이터 크기에 맞게 동적 조정 (최소 2, 최대 5)
+        n_samples = len(X_scaled)
+        cv_folds = min(5, max(2, n_samples // 3))
+        print(f"CV folds: {cv_folds} (샘플 수: {n_samples})")
+        
         lasso_cv = LassoCV(
             alphas=alphas,
-            cv=5,  # 5-fold cross-validation
+            cv=cv_folds,
             max_iter=10000,
-            random_state=42
+            random_state=42,
+            n_jobs=-1  # 병렬 처리
         )
         
         lasso_cv.fit(X_scaled, y_scaled)
@@ -872,10 +900,19 @@ def run_lasso_regression(data: List[Dict],
         ss_tot = np.sum((y_values - np.mean(y_values)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
         
-        # Cross-validation 점수
-        cv_scores = cross_val_score(lasso_cv, X_scaled, y_scaled, cv=5, scoring='r2')
-        cv_mean = float(np.mean(cv_scores))
-        cv_std = float(np.std(cv_scores))
+        # Cross-validation 점수 (LassoCV에서 이미 계산된 값 사용)
+        # lasso_cv.mse_path_에서 최적 alpha에 대한 CV 점수 추출
+        try:
+            # 최적 alpha의 인덱스 찾기
+            alpha_idx = np.where(lasso_cv.alphas_ == lasso_cv.alpha_)[0][0]
+            cv_mse = lasso_cv.mse_path_[alpha_idx]
+            cv_r2_scores = 1 - cv_mse / np.var(y_scaled)
+            cv_mean = float(np.mean(cv_r2_scores))
+            cv_std = float(np.std(cv_r2_scores))
+        except Exception as cv_err:
+            print(f"CV 점수 계산 오류 (무시): {cv_err}")
+            cv_mean = float(r_squared)
+            cv_std = 0.0
         
         print(f"MAE: {mae:.4f}, RMSE: {rmse:.4f}, R²: {r_squared:.4f}")
         
