@@ -1,0 +1,55 @@
+# =====================================================
+# Docker Compose - 프로덕션 테스트 환경
+# Railway 배포 전 로컬에서 프로덕션 빌드 테스트
+# =====================================================
+
+version: '3.8'
+
+services:
+  # Next.js 웹 애플리케이션 (프로덕션 빌드)
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=${NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY}
+    container_name: midcam-nextjs-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=${NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY}
+      - PYTHON_API_URL=http://python-api:8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      - .env.local
+    depends_on:
+      - python-api
+    networks:
+      - midcam-network
+    restart: unless-stopped
+
+  # Python FastAPI 회귀분석 서버 (프로덕션)
+  python-api:
+    build:
+      context: ./scripts/api
+      dockerfile: Dockerfile
+    container_name: midcam-python-api-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ALLOWED_ORIGINS=http://localhost:3000,http://nextjs:3000
+      - PORT=8000
+    networks:
+      - midcam-network
+    restart: unless-stopped
+
+networks:
+  midcam-network:
+    driver: bridge
+

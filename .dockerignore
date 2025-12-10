@@ -36,7 +36,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Python API는 이제 포함됨 (통합 Docker)
+# Python API 제외 (별도 컨테이너)
+scripts/api/
+
+# Python 파일
+*.py
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
 
 # Git
 .git
@@ -45,9 +56,20 @@ next-env.d.ts
 # IDE
 .vscode
 .idea
+.cursor
 
 # Documentation
 docs/
 *.md
 !README.md
+
+# Docker 관련
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# 테스트 및 기타
+.pytest_cache/
+.coverage
+htmlcov/
 

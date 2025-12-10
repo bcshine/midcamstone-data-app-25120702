@@ -1,0 +1,51 @@
+# =====================================================
+# Python API Docker Ignore
+# =====================================================
+
+# Python 캐시 및 바이트코드
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상 환경
+venv/
+env/
+ENV/
+.venv
+
+# 테스트 관련
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS 관련
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# 문서
+*.md
+!README.md
+
+# 로그
+*.log
+
+# 환경 변수 (Railway에서 설정)
+.env
+.env.local
+.env.*.local
+

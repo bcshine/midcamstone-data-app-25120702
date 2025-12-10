@@ -23,22 +23,53 @@ pip install -r requirements.txt
 
 ### 2. 환경 변수 설정
 
-프로젝트 루트에 `.env.local` 파일을 생성하세요:
+`.env.example` 파일을 `.env.local`로 복사하고 실제 값을 입력하세요:
 
+```bash
+cp .env.example .env.local
+```
+
+필수 환경 변수:
 ```env
 # Supabase 설정 (필수)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Python 분석 서버 URL
-PYTHON_API_URL=http://localhost:8000
-
 # OpenAI API 키 (LLM 해석 기능용, 선택사항)
 OPENAI_API_KEY=your-openai-key
 ```
 
 ### 3. 개발 서버 실행
+
+#### 옵션 A: Docker Compose 사용 (권장)
+
+Docker가 설치되어 있다면 한 줄로 전체 환경을 실행할 수 있습니다:
+
+```bash
+# 전체 환경 실행 (Next.js + Python API)
+docker-compose up
+
+# 백그라운드 실행
+docker-compose up -d
+
+# 로그 확인
+docker-compose logs -f
+
+# 종료
+docker-compose down
+```
+
+- Next.js: http://localhost:3000
+- Python API: http://localhost:8000
+- API 문서: http://localhost:8000/docs
+
+**장점:**
+- 한 번에 모든 서비스 실행
+- Hot reload 지원
+- 환경 일관성 보장
+
+#### 옵션 B: 직접 실행
 
 ```bash
 # 터미널 1: Next.js 서버
@@ -55,11 +86,37 @@ python main.py
 
 ---
 
+## 🐳 Docker
+
+### 로컬 개발
+
+```bash
+# 개발 환경 실행 (hot reload)
+docker-compose up
+
+# 프로덕션 테스트 (실제 빌드)
+docker-compose -f docker-compose.prod.yml up --build
+```
+
+### 이미지 빌드
+
+```bash
+# Next.js 이미지
+docker build -t midcam-nextjs .
+
+# Python API 이미지
+docker build -t midcam-python-api ./scripts/api
+```
+
+자세한 내용은 [Docker 문서](./docs/DOCKER.md)를 참조하세요.
+
+---
+
 ## 🚂 Railway 배포
 
-이 프로젝트는 **두 개의 Railway 서비스**로 배포해야 합니다:
-1. **Next.js 앱** (메인 웹 서비스)
-2. **Python FastAPI** (회귀분석 API 서비스)
+이 프로젝트는 **두 개의 독립적인 Railway 서비스**로 배포됩니다:
+1. **Next.js 앱** - 루트 `Dockerfile` 사용
+2. **Python FastAPI** - `scripts/api/Dockerfile` 사용
 
 ### 배포 단계
 
@@ -72,14 +129,16 @@ python main.py
 
 #### 2단계: Next.js 서비스 설정
 
-Railway가 자동으로 Next.js를 감지합니다.
+**서비스 설정:**
+- Builder: `DOCKERFILE` (루트 `Dockerfile` 자동 감지)
+- Root Directory: `/` (기본값)
 
 **환경 변수 설정** (Railway 대시보드 > Variables):
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-PYTHON_API_URL=https://your-python-service.railway.internal
+PYTHON_API_URL=http://your-python-service.railway.internal:8000
 OPENAI_API_KEY=your-openai-key (선택사항)
 ```
 
@@ -88,6 +147,7 @@ OPENAI_API_KEY=your-openai-key (선택사항)
 1. Railway 프로젝트 대시보드에서 "New Service" 클릭
 2. 같은 GitHub 레포지토리 선택
 3. **Root Directory**를 `scripts/api`로 설정
+4. Builder가 `DOCKERFILE`로 설정되었는지 확인
 
 **환경 변수 설정**:
 ```
@@ -98,8 +158,8 @@ PORT=8000
 #### 4단계: 서비스 연결
 
 Next.js 서비스의 `PYTHON_API_URL`을 Python 서비스의 내부 URL로 설정:
-- Railway 내부 URL: `http://your-python-service.railway.internal:8000`
-- 또는 공개 URL: `https://your-python-service.railway.app`
+- **권장**: Railway 내부 URL: `http://python-api.railway.internal:8000` (더 빠름, 무료)
+- 대안: 공개 URL: `https://your-python-service.railway.app` (외부 접근 가능)
 
 ### Railway 환경 변수 요약
 

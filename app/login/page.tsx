@@ -26,7 +26,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [rememberMe, setRememberMe] = useState(false);
 
   /**
    * 탭 변경 핸들러
@@ -138,7 +137,7 @@ export default function LoginPage() {
           // 역할 설정 실패해도 회원가입은 성공으로 처리
         }
 
-        setSuccess("인증 이메일이 전송되었습니다. 이메일을 확인 후 로그인해주세요.");
+        setSuccess("회원가입이 완료되었습니다! 로그인해주세요.");
         setActiveTab("login");
         setPassword("");
         setPasswordConfirm("");
@@ -229,21 +228,6 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* 자동 로그인 체크박스 */}
-              <div className="flex items-center gap-3">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  disabled={isLoading}
-                  className="w-5 h-5 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="text-sm text-slate-400 cursor-pointer select-none">
-                  로그인 상태 유지
-                </label>
-              </div>
-
               {/* 성공 메시지 */}
               {success && (
                 <div className="p-4 bg-emerald-900/30 border border-emerald-700 rounded-xl">
@@ -286,17 +270,9 @@ export default function LoginPage() {
             <form onSubmit={handleSignup} className="space-y-5">
               {/* 이메일 입력 */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label htmlFor="signup-email" className="block text-sm font-medium text-slate-300">
+                <label htmlFor="signup-email" className="block text-sm font-medium text-slate-300 mb-2">
                   이메일
                 </label>
-                  <span className="text-xs text-amber-400 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    인증 이메일 전송됩니다
-                  </span>
-                </div>
                 <input
                   id="signup-email"
                   type="email"

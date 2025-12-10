@@ -1,0 +1,59 @@
+# =====================================================
+# Docker Compose - 로컬 개발 환경
+# Hot reload 지원, 볼륨 마운트
+# =====================================================
+
+# version 속성은 더 이상 필요하지 않습니다 (Docker Compose v2+)
+
+services:
+  # Next.js 웹 애플리케이션
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # 개발 스테이지 사용
+    container_name: midcam-nextjs-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # 소스 코드 hot reload를 위한 볼륨 마운트
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - PYTHON_API_URL=http://python-api:8000
+    env_file:
+      - .env.local
+    depends_on:
+      - python-api
+    networks:
+      - midcam-network
+    restart: unless-stopped
+    command: npm run dev
+
+  # Python FastAPI 회귀분석 서버
+  python-api:
+    build:
+      context: ./scripts/api
+      dockerfile: Dockerfile
+    container_name: midcam-python-api-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # Python 코드 hot reload를 위한 볼륨 마운트
+      - ./scripts/api:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ALLOWED_ORIGINS=http://localhost:3000,http://nextjs:3000
+      - PORT=8000
+    networks:
+      - midcam-network
+    restart: unless-stopped
+    # uvicorn의 --reload 옵션으로 hot reload 활성화
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+networks:
+  midcam-network:
+    driver: bridge
+
