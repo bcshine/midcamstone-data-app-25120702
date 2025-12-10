@@ -909,33 +909,39 @@ def run_lasso_regression(data: List[Dict],
             return {"error": "Lasso가 모든 변수를 제거했습니다. alpha 값이 너무 높을 수 있습니다."}
         
         # =====================================================
-        # 6단계: 예측 및 정확도 지표 계산
+        # 6단계: 예측 및 정확도 지표 계산 (훈련/테스트 분할)
         # =====================================================
-        y_pred_scaled = lasso_cv.predict(X_scaled)
+        from sklearn.model_selection import cross_val_predict, cross_val_score
+        
+        # 교차검증으로 예측값 생성 (각 샘플은 테스트 세트일 때의 예측값)
+        y_pred_scaled = cross_val_predict(lasso_cv, X_scaled, y_scaled, cv=cv_folds)
         y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
         
-        # MAE, RMSE 계산
+        # MAE, RMSE 계산 (테스트 기준)
         mae = float(mean_absolute_error(y_values, y_pred))
         rmse = float(np.sqrt(mean_squared_error(y_values, y_pred)))
         
-        # R² 계산
+        # R² 계산 (교차검증 기반 - 진짜 예측 성능)
         ss_res = np.sum((y_values - y_pred) ** 2)
         ss_tot = np.sum((y_values - np.mean(y_values)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
         
-        # Cross-validation 점수 (LassoCV에서 이미 계산된 값 사용)
-        # lasso_cv.mse_path_에서 최적 alpha에 대한 CV 점수 추출
-        try:
-            # 최적 alpha의 인덱스 찾기
-            alpha_idx = np.where(lasso_cv.alphas_ == lasso_cv.alpha_)[0][0]
-            cv_mse = lasso_cv.mse_path_[alpha_idx]
-            cv_r2_scores = 1 - cv_mse / np.var(y_scaled)
-            cv_mean = float(np.mean(cv_r2_scores))
-            cv_std = float(np.std(cv_r2_scores))
-        except Exception as cv_err:
-            print(f"CV 점수 계산 오류 (무시): {cv_err}")
-            cv_mean = float(r_squared)
-            cv_std = 0.0
+        # 훈련 R² (참고용) - 과적합 확인용
+        y_pred_train = lasso_cv.predict(X_scaled)
+        y_pred_train_orig = scaler_y.inverse_transform(y_pred_train.reshape(-1, 1)).ravel()
+        ss_res_train = np.sum((y_values - y_pred_train_orig) ** 2)
+        r_squared_train = 1 - (ss_res_train / ss_tot) if ss_tot != 0 else 0
+        
+        # Cross-validation R² 점수
+        cv_scores = cross_val_score(lasso_cv, X_scaled, y_scaled, cv=cv_folds, scoring='r2')
+        cv_mean = float(np.mean(cv_scores))
+        cv_std = float(np.std(cv_scores))
+        
+        print(f"훈련 R²: {r_squared_train:.4f}, CV R²: {cv_mean:.4f} (±{cv_std:.4f})")
+        
+        # 과적합 경고
+        if r_squared_train > 0.95 and cv_mean < 0.5:
+            print(f"⚠️ 과적합 경고: 훈련 R²={r_squared_train:.2f}, CV R²={cv_mean:.2f}")
         
         print(f"MAE: {mae:.4f}, RMSE: {rmse:.4f}, R²: {r_squared:.4f}")
         
@@ -1044,12 +1050,12 @@ def run_lasso_regression(data: List[Dict],
         }
         
         # =====================================================
-        # 결과 해석 생성
+        # 결과 해석 생성 (CV R² 기반)
         # =====================================================
         interpretation = generate_lasso_interpretation(
-            optimal_alpha, r_squared, mae, rmse,
+            optimal_alpha, cv_mean, mae, rmse,  # r_squared 대신 cv_mean 사용
             selected_vars, removed_by_correlation, zero_vars,
-            original_scale_coefficients, cv_mean, cv_std
+            original_scale_coefficients, cv_mean, cv_std, r_squared_train
         )
         
         # =====================================================
@@ -1082,16 +1088,17 @@ def run_lasso_regression(data: List[Dict],
                 "cv_r2_std": round(cv_std, 4)
             },
             
-            # 모델 요약
+            # 모델 요약 (Lasso는 CV R²가 주요 지표)
             "model_summary": {
-                "r": round(safe_float(np.sqrt(max(0, r_squared))), 4),  # 음수 방지
-                "r_squared": round(safe_float(r_squared), 4),
-                "adj_r_squared": round(float(r_squared), 4),  # Lasso는 조정 R² 대신 CV R² 사용
+                "r": round(safe_float(np.sqrt(max(0, cv_mean))), 4),  # CV R² 기반
+                "r_squared": round(safe_float(cv_mean), 4),  # CV R² (진짜 예측 성능)
+                "adj_r_squared": round(safe_float(r_squared), 4),  # 교차검증 예측 기반 R²
                 "std_error_estimate": round(rmse, 4),
                 "mae": round(mae, 4),
                 "rmse": round(rmse, 4),
                 "cv_r2_mean": round(cv_mean, 4),
                 "cv_r2_std": round(cv_std, 4),
+                "r_squared_train": round(safe_float(r_squared_train), 4),  # 훈련 R² (참고용)
                 "f_statistic": None,  # Lasso는 F-통계량 미제공
                 "f_pvalue": None,
                 "aic": None,
@@ -1161,44 +1168,54 @@ def run_lasso_regression(data: List[Dict],
         return {"error": f"Lasso 분석 중 오류 발생: {str(e)}"}
 
 
-def generate_lasso_interpretation(optimal_alpha: float, r_squared: float,
+def generate_lasso_interpretation(optimal_alpha: float, cv_r2: float,
                                    mae: float, rmse: float,
                                    selected_vars: List[str],
                                    removed_by_correlation: List[str],
                                    zero_vars: List[str],
                                    coefficients: List[Dict],
-                                   cv_mean: float, cv_std: float) -> str:
+                                   cv_mean: float, cv_std: float,
+                                   r_squared_train: float = None) -> str:
     """
-    Lasso 회귀분석 결과 해석 생성
+    Lasso 회귀분석 결과 해석 생성 (CV R² 기반)
     """
     interpretation = []
     
-    # 1. 모델 설명력
-    if r_squared >= 0.7:
-        interpretation.append(f"Lasso 모델의 설명력이 매우 높습니다 (R² = {r_squared:.3f}).")
-    elif r_squared >= 0.5:
-        interpretation.append(f"Lasso 모델의 설명력이 양호합니다 (R² = {r_squared:.3f}).")
+    # 1. 모델 설명력 (CV R² 기준)
+    if cv_r2 >= 0.7:
+        interpretation.append(f"Lasso 모델의 예측 성능이 매우 높습니다 (CV R² = {cv_r2:.3f}).")
+    elif cv_r2 >= 0.5:
+        interpretation.append(f"Lasso 모델의 예측 성능이 양호합니다 (CV R² = {cv_r2:.3f}).")
+    elif cv_r2 >= 0.3:
+        interpretation.append(f"Lasso 모델의 예측 성능이 보통입니다 (CV R² = {cv_r2:.3f}).")
     else:
-        interpretation.append(f"Lasso 모델의 설명력이 낮습니다 (R² = {r_squared:.3f}). 추가 변수가 필요할 수 있습니다.")
+        interpretation.append(f"Lasso 모델의 예측 성능이 낮습니다 (CV R² = {cv_r2:.3f}). 추가 변수나 다른 모델이 필요할 수 있습니다.")
     
-    # 2. 최적 alpha
+    # 2. 과적합 경고
+    if r_squared_train and r_squared_train > 0.9 and cv_r2 < 0.5:
+        interpretation.append(f"⚠️ 과적합 주의: 훈련 R²({r_squared_train:.2f})와 CV R²({cv_r2:.2f})의 차이가 큽니다.")
+    
+    # 3. 최적 alpha
     interpretation.append(f"최적 정규화 강도: α = {optimal_alpha:.6f}.")
     
-    # 3. 변수 선택 결과
-    interpretation.append(f"Lasso가 {len(selected_vars)}개 변수를 선택했습니다: {', '.join(selected_vars)}.")
+    # 4. 변수 선택 결과
+    if len(selected_vars) <= 5:
+        interpretation.append(f"Lasso가 {len(selected_vars)}개 변수를 선택했습니다: {', '.join(selected_vars)}.")
+    else:
+        interpretation.append(f"Lasso가 {len(selected_vars)}개 변수를 선택했습니다.")
     
-    # 4. 제거된 변수
+    # 5. 제거된 변수
     total_removed = len(removed_by_correlation) + len(zero_vars)
     if total_removed > 0:
         interpretation.append(f"총 {total_removed}개 변수가 제거되었습니다 (상관계수 필터링: {len(removed_by_correlation)}개, Lasso 제외: {len(zero_vars)}개).")
     
-    # 5. 예측 정확도
-    interpretation.append(f"예측 정확도: MAE = {mae:.4f}, RMSE = {rmse:.4f}.")
+    # 6. 예측 정확도
+    interpretation.append(f"예측 오차: MAE = {mae:.4f}, RMSE = {rmse:.4f}.")
     
-    # 6. 교차검증 결과
-    interpretation.append(f"5-Fold 교차검증 R²: {cv_mean:.4f} (±{cv_std:.4f}).")
+    # 7. 교차검증 신뢰구간
+    interpretation.append(f"교차검증 R²: {cv_mean:.4f} (±{cv_std:.4f}).")
     
-    # 7. 주요 영향 변수
+    # 8. 주요 영향 변수
     if coefficients:
         sorted_coefs = sorted(coefficients, key=lambda x: abs(x['coefficient_scaled']), reverse=True)
         top_vars = [c['variable'] for c in sorted_coefs[:3]]
