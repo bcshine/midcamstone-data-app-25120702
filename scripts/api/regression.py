@@ -131,15 +131,15 @@ def calculate_descriptive_stats(df: pd.DataFrame, columns: List[str]) -> List[Di
                 stats_list.append({
                     "variable": col,
                     "n": int(len(col_data)),
-                    "mean": float(round(col_data.mean(), 4)),
-                    "std": float(round(col_data.std(), 4)),
-                    "min": float(round(col_data.min(), 4)),
-                    "q25": float(round(col_data.quantile(0.25), 4)),
-                    "median": float(round(col_data.median(), 4)),
-                    "q75": float(round(col_data.quantile(0.75), 4)),
-                    "max": float(round(col_data.max(), 4)),
-                    "skewness": float(round(col_data.skew(), 4)),
-                    "kurtosis": float(round(col_data.kurtosis(), 4))
+                    "mean": round(safe_float(col_data.mean()), 4),
+                    "std": round(safe_float(col_data.std()), 4),
+                    "min": round(safe_float(col_data.min()), 4),
+                    "q25": round(safe_float(col_data.quantile(0.25)), 4),
+                    "median": round(safe_float(col_data.median()), 4),
+                    "q75": round(safe_float(col_data.quantile(0.75)), 4),
+                    "max": round(safe_float(col_data.max()), 4),
+                    "skewness": round(safe_float(col_data.skew()), 4),
+                    "kurtosis": round(safe_float(col_data.kurtosis()), 4)
                 })
     
     return stats_list
@@ -171,7 +171,9 @@ def calculate_correlation_matrix(df: pd.DataFrame, columns: List[str]) -> List[D
         row = {"variable": var1}
         for var2 in columns:
             if var1 in corr_matrix.index and var2 in corr_matrix.columns:
-                row[var2] = round(float(corr_matrix.loc[var1, var2]), 4)
+                corr_value = corr_matrix.loc[var1, var2]
+                # NaN 값을 safe_float로 처리 (기본값 0.0)
+                row[var2] = round(safe_float(corr_value, 0.0), 4)
             else:
                 row[var2] = 0.0
         correlation_list.append(row)
@@ -203,11 +205,28 @@ def run_regression(data: List[Dict],
         회귀분석 결과 딕셔너리
     """
     try:
+        # =====================================================
+        # 0단계: 입력 데이터 검증
+        # =====================================================
+        if not data or len(data) == 0:
+            return {"error": "데이터가 비어있습니다."}
+        
+        if not dependent_var:
+            return {"error": "종속변수가 지정되지 않았습니다."}
+        
+        if not independent_vars or len(independent_vars) == 0:
+            return {"error": "독립변수가 지정되지 않았습니다."}
+        
         # 데이터프레임 생성
         df = pd.DataFrame(data)
         
-        # 분석에 필요한 컬럼만 추출
+        # 필요한 컬럼이 존재하는지 확인
         all_vars = [dependent_var] + independent_vars
+        missing_cols = [col for col in all_vars if col not in df.columns]
+        if missing_cols:
+            return {"error": f"데이터에 없는 컬럼: {', '.join(missing_cols)}"}
+        
+        # 분석에 필요한 컬럼만 추출
         analysis_df = df[all_vars].copy()
         
         # 숫자형으로 변환
@@ -218,8 +237,38 @@ def run_regression(data: List[Dict],
         analysis_df = analysis_df.dropna()
         initial_count = len(analysis_df)
         
+        if initial_count < 10:
+            return {"error": f"유효한 데이터가 {initial_count}개뿐입니다. 최소 10개 이상의 데이터가 필요합니다."}
+        
         if initial_count < len(independent_vars) + 2:
             return {"error": "데이터가 충분하지 않습니다. 최소 (독립변수 수 + 2)개의 행이 필요합니다."}
+        
+        # =====================================================
+        # 상수 변수 (분산 = 0) 사전 제거
+        # =====================================================
+        constant_vars = []
+        valid_independent_vars = []
+        
+        for var in independent_vars:
+            var_std = analysis_df[var].std()
+            if var_std == 0 or np.isnan(var_std):
+                constant_vars.append(var)
+            else:
+                valid_independent_vars.append(var)
+        
+        if constant_vars:
+            print(f"  [경고] 상수 변수 제외됨: {constant_vars}")
+        
+        if len(valid_independent_vars) == 0:
+            return {"error": "모든 독립변수가 상수값입니다. 변동이 있는 변수를 선택해주세요."}
+        
+        # 유효한 독립변수로 교체
+        independent_vars = valid_independent_vars
+        
+        # 종속변수도 상수인지 확인
+        y_std = analysis_df[dependent_var].std()
+        if y_std == 0 or np.isnan(y_std):
+            return {"error": "종속변수가 상수값입니다. 변동이 있는 변수를 선택해주세요."}
         
         # =====================================================
         # 1단계: 다중공선성 제거 (VIF > 10)
@@ -360,10 +409,18 @@ def run_regression(data: List[Dict],
         # =====================================================
         # 잔차 진단 (Jarque-Bera, 이상치 분석 추가)
         # =====================================================
-        standardized_residuals = residuals / np.std(residuals)
+        # 표준편차가 0인 경우 방지 (상수 잔차)
+        residual_std = np.std(residuals)
+        if residual_std == 0 or np.isnan(residual_std):
+            standardized_residuals = np.zeros_like(residuals)
+        else:
+            standardized_residuals = residuals / residual_std
         
-        # Jarque-Bera 정규성 검정
-        jb_stat, jb_pvalue = stats.jarque_bera(residuals)
+        # Jarque-Bera 정규성 검정 (데이터가 충분할 때만)
+        if len(residuals) >= 8:
+            jb_stat, jb_pvalue = stats.jarque_bera(residuals)
+        else:
+            jb_stat, jb_pvalue = 0.0, 1.0  # 데이터 부족 시 기본값
         
         # Durbin-Watson 자기상관 검정
         dw_stat = float(durbin_watson(residuals))
@@ -394,7 +451,10 @@ def run_regression(data: List[Dict],
         # =====================================================
         # 계수 정보 (표준화 계수 포함)
         # =====================================================
-        std_y = y.std()
+        std_y = safe_float(y.std())
+        if std_y == 0:
+            std_y = 1.0  # 종속변수 표준편차가 0이면 1로 설정 (상수 종속변수 방지)
+        
         coefficients = []
         
         # 상수항
@@ -412,15 +472,19 @@ def run_regression(data: List[Dict],
         
         # 주효과
         for var in final_main_vars:
-            std_x = analysis_df[var].std()
-            beta = model.params[var] * (std_x / std_y) if std_y != 0 else 0
+            std_x = safe_float(analysis_df[var].std())
+            if std_x == 0:
+                std_x = 1.0  # 상수 변수 방지
+            
+            param_val = safe_float(model.params[var])
+            beta = param_val * (std_x / std_y)
             
             vif_value = vif_dict.get(var)
             tolerance = round(1.0 / vif_value, 4) if vif_value and vif_value > 0 else None
             
             coefficients.append({
                 "variable": var,
-                "b": round(safe_float(model.params[var]), 6),
+                "b": round(param_val, 6),
                 "std_error": round(safe_float(model.bse[var]), 6),
                 "beta": round(safe_float(beta), 6),
                 "t_statistic": round(safe_float(model.tvalues[var]), 4),
@@ -432,12 +496,16 @@ def run_regression(data: List[Dict],
         
         # 상호작용 항
         for var in interaction_terms:
-            std_x = analysis_df[var].std()
-            beta = model.params[var] * (std_x / std_y) if std_y != 0 else 0
+            std_x = safe_float(analysis_df[var].std())
+            if std_x == 0:
+                std_x = 1.0  # 상수 상호작용 항 방지
+            
+            param_val = safe_float(model.params[var])
+            beta = param_val * (std_x / std_y)
             
             coefficients.append({
                 "variable": var,
-                "b": round(safe_float(model.params[var]), 6),
+                "b": round(param_val, 6),
                 "std_error": round(safe_float(model.bse[var]), 6),
                 "beta": round(safe_float(beta), 6),
                 "t_statistic": round(safe_float(model.tvalues[var]), 4),
@@ -450,9 +518,10 @@ def run_regression(data: List[Dict],
         # =====================================================
         # 회귀식 생성
         # =====================================================
-        equation_parts = [f"{round(model.params[const_col], 4)}"]
+        const_coef = safe_float(model.params[const_col])
+        equation_parts = [f"{round(const_coef, 4)}"]
         for var in all_analysis_vars:
-            coef = model.params[var]
+            coef = safe_float(model.params[var])
             sign = "+" if coef >= 0 else "-"
             equation_parts.append(f"{sign} {abs(round(coef, 4))} * {var}")
         
@@ -500,7 +569,14 @@ def run_regression(data: List[Dict],
         # =====================================================
         # 결과 반환
         # =====================================================
-        r_multiple = float(np.sqrt(model.rsquared))
+        # R² 값이 음수거나 NaN인 경우 방지
+        rsquared_val = safe_float(model.rsquared, 0.0)
+        if rsquared_val < 0:
+            rsquared_val = 0.0
+        r_multiple = float(np.sqrt(rsquared_val))
+        
+        # 표준오차 추정치 (mse가 음수일 수 있으니 방지)
+        std_error_estimate = round(safe_float(np.sqrt(max(mse, 0))), 4)
         
         result = {
             "success": True,
@@ -517,11 +593,11 @@ def run_regression(data: List[Dict],
             
             # 모델 요약
             "model_summary": {
-                "r": round(r_multiple, 4),
-                "r_squared": round(safe_float(model.rsquared), 4),
+                "r": round(safe_float(r_multiple), 4),
+                "r_squared": round(rsquared_val, 4),
                 "adj_r_squared": round(safe_float(model.rsquared_adj), 4),
-                "std_error_estimate": round(np.sqrt(mse), 4),
-                "durbin_watson": round(dw_stat, 4),
+                "std_error_estimate": std_error_estimate,
+                "durbin_watson": round(safe_float(dw_stat), 4),
                 "f_statistic": round(safe_float(model.fvalue), 4),
                 "f_pvalue": round(safe_float(model.f_pvalue), 6),
                 "aic": round(safe_float(model.aic), 4),
@@ -671,6 +747,10 @@ def calculate_interaction_effects(data: List[Dict],
         
         df = df.dropna()
         
+        # 데이터가 충분하지 않은 경우
+        if len(df) < 10:
+            return {"interactions": [], "message": "데이터가 충분하지 않습니다."}
+        
         if len(independent_vars) < 2:
             return {"interactions": []}
         
@@ -693,18 +773,27 @@ def calculate_interaction_effects(data: List[Dict],
                 try:
                     model = sm.OLS(y, X_interaction).fit()
                     
+                    # NaN 방지를 위한 safe_float 적용
+                    coef_val = safe_float(model.params[interaction_name])
+                    t_val = safe_float(model.tvalues[interaction_name])
+                    p_val = safe_float(model.pvalues[interaction_name], 1.0)  # 기본값 1.0 (유의하지 않음)
+                    
                     interactions.append({
                         "variables": [var1, var2],
                         "interaction_term": interaction_name,
-                        "coefficient": float(round(model.params[interaction_name], 4)),
-                        "t_statistic": float(round(model.tvalues[interaction_name], 4)),
-                        "p_value": float(round(model.pvalues[interaction_name], 4)),
-                        "significant": model.pvalues[interaction_name] < 0.05
+                        "coefficient": round(coef_val, 4),
+                        "t_statistic": round(t_val, 4),
+                        "p_value": round(p_val, 4),
+                        "significant": p_val < 0.05
                     })
-                except:
-                    pass
+                except Exception as model_error:
+                    # 모델 피팅 실패 시 건너뛰기
+                    print(f"  상호작용 분석 실패: {interaction_name} - {str(model_error)}")
+                    continue
         
         return {"interactions": interactions}
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}

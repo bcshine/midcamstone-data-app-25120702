@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:all": "start-local.bat",
+    "python": "cd scripts/api && .\\venv\\Scripts\\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.2",
